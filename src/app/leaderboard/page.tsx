@@ -1,0 +1,299 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import {
+  Trophy,
+  Search,
+  RefreshCw,
+  Plus,
+  Minus,
+  MoreVertical,
+} from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { getPracticeLeaderboard, getQuizLeaderboard, updateQuizPoints } from "@/lib/data-service";
+import { toast } from "@/components/ui/use-toast";
+
+// Define types for our leaderboard data
+type PracticeLeaderboardItem = {
+  student_id: string;
+  name: string;
+  time: string;
+  points: number;
+  rank: number;
+};
+
+type QuizLeaderboardItem = {
+  student_id: string;
+  name: string;
+  points: number;
+  rank: number;
+};
+
+export default function Leaderboard() {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [practiceData, setPracticeData] = useState<PracticeLeaderboardItem[]>([]);
+  const [quizData, setQuizData] = useState<QuizLeaderboardItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  
+  // Fetch leaderboard data on component mount
+  useEffect(() => {
+    fetchLeaderboardData();
+  }, []);
+  
+  // Function to fetch leaderboard data
+  const fetchLeaderboardData = async () => {
+    setLoading(true);
+    try {
+      const practiceLeaderboard = await getPracticeLeaderboard();
+      const quizLeaderboard = await getQuizLeaderboard();
+      
+      setPracticeData(practiceLeaderboard);
+      setQuizData(quizLeaderboard);
+    } catch (error) {
+      console.error("Error fetching leaderboard data:", error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch leaderboard data. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Function to update quiz points
+  const handleUpdateQuizPoints = async (studentId: string, increment: number) => {
+    try {
+      const success = await updateQuizPoints(studentId, increment);
+      
+      if (success) {
+        // Refresh leaderboard data
+        fetchLeaderboardData();
+        toast({
+          title: "Success",
+          description: `Quiz points ${increment > 0 ? "increased" : "decreased"} successfully.`,
+        });
+      } else {
+        throw new Error("Failed to update points");
+      }
+    } catch (error) {
+      console.error("Error updating quiz points:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update quiz points. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  // Function to handle reset all points and time
+  const handleResetAll = async () => {
+    // This would need to be implemented on the server/database side
+    // For now, just show a toast message
+    toast({
+      title: "Reset not implemented",
+      description: "This functionality has not been implemented yet.",
+      variant: "destructive",
+    });
+  };
+  
+  // Function to handle calibrate points
+  const handleCalibratePoints = async () => {
+    // This would need to be implemented on the server/database side
+    // For now, just show a toast message
+    toast({
+      title: "Calibration not implemented",
+      description: "This functionality has not been implemented yet.",
+      variant: "destructive",
+    });
+  };
+  
+  // Filter practice data based on search query
+  const filteredPracticeData = practiceData.filter((student) =>
+    student.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+  
+  // Filter quiz data based on search query
+  const filteredQuizData = quizData.filter((student) =>
+    student.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  return (
+    <div className="p-6 space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold flex items-center">
+          <Trophy className="mr-2 h-8 w-8" /> Leaderboard
+        </h1>
+      </div>
+
+      <div className="w-full flex justify-between mb-6">
+        <div className="max-w-sm w-full relative">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search students..."
+            className="pl-8 w-full"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={fetchLeaderboardData}>
+            <RefreshCw className="h-4 w-4 mr-2" /> Refresh
+          </Button>
+          <Button onClick={handleCalibratePoints}>
+            Calibrate Points
+          </Button>
+          <Button variant="destructive" onClick={handleResetAll}>
+            Reset All Points & Time
+          </Button>
+        </div>
+      </div>
+
+      <Tabs defaultValue="practice" className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="practice">Practice</TabsTrigger>
+          <TabsTrigger value="quiz">Quiz</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="practice" className="rounded-lg border bg-card">
+          {loading ? (
+            <div className="text-center py-8">Loading practice data...</div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[100px]">Rank</TableHead>
+                  <TableHead>Student</TableHead>
+                  <TableHead>Practice Time</TableHead>
+                  <TableHead>Practice Points</TableHead>
+                  <TableHead className="w-[50px]"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredPracticeData.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8">
+                      {practiceData.length === 0
+                        ? "No practice data available."
+                        : "No students match your search query."}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredPracticeData.map((student) => (
+                    <TableRow key={student.student_id}>
+                      <TableCell className="font-medium">
+                        {student.rank === 1 ? (
+                          <div className="flex items-center justify-center bg-yellow-500 text-white w-8 h-8 rounded-full">
+                            <Trophy className="h-4 w-4" />
+                          </div>
+                        ) : student.rank === 2 ? (
+                          <div className="flex items-center justify-center bg-gray-400 text-white w-8 h-8 rounded-full">
+                            <Trophy className="h-4 w-4" />
+                          </div>
+                        ) : student.rank === 3 ? (
+                          <div className="flex items-center justify-center bg-amber-700 text-white w-8 h-8 rounded-full">
+                            <Trophy className="h-4 w-4" />
+                          </div>
+                        ) : (
+                          <div className="ml-3">#{student.rank}</div>
+                        )}
+                      </TableCell>
+                      <TableCell>{student.name}</TableCell>
+                      <TableCell>{student.time}</TableCell>
+                      <TableCell>{student.points.toLocaleString()}</TableCell>
+                      <TableCell>
+                        <Button variant="ghost" size="icon">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          )}
+        </TabsContent>
+        
+        <TabsContent value="quiz" className="rounded-lg border bg-card">
+          {loading ? (
+            <div className="text-center py-8">Loading quiz data...</div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[100px]">Rank</TableHead>
+                  <TableHead>Student</TableHead>
+                  <TableHead>Quiz Points</TableHead>
+                  <TableHead className="w-[130px]">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredQuizData.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center py-8">
+                      {quizData.length === 0
+                        ? "No quiz data available."
+                        : "No students match your search query."}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredQuizData.map((student) => (
+                    <TableRow key={student.student_id}>
+                      <TableCell className="font-medium">
+                        {student.rank === 1 ? (
+                          <div className="flex items-center justify-center bg-yellow-500 text-white w-8 h-8 rounded-full">
+                            <Trophy className="h-4 w-4" />
+                          </div>
+                        ) : student.rank === 2 ? (
+                          <div className="flex items-center justify-center bg-gray-400 text-white w-8 h-8 rounded-full">
+                            <Trophy className="h-4 w-4" />
+                          </div>
+                        ) : student.rank === 3 ? (
+                          <div className="flex items-center justify-center bg-amber-700 text-white w-8 h-8 rounded-full">
+                            <Trophy className="h-4 w-4" />
+                          </div>
+                        ) : (
+                          <div className="ml-3">#{student.rank}</div>
+                        )}
+                      </TableCell>
+                      <TableCell>{student.name}</TableCell>
+                      <TableCell>{student.points.toFixed(2)}</TableCell>
+                      <TableCell>
+                        <div className="flex space-x-2">
+                          <Button 
+                            variant="outline" 
+                            size="icon"
+                            onClick={() => handleUpdateQuizPoints(student.student_id, 0.5)}
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="icon"
+                            onClick={() => handleUpdateQuizPoints(student.student_id, -0.5)}
+                          >
+                            <Minus className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          )}
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+} 
