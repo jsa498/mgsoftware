@@ -12,7 +12,7 @@ export default async function Home() {
   const feeAlerts = await getFeeAlerts()
   
   return (
-    <DashboardLayout>
+    <DashboardLayout requireAdmin={true}>
       <div className="space-y-6">
         <h1 className="text-3xl font-bold">Dashboard</h1>
         

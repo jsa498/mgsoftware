@@ -894,4 +894,117 @@ export async function getAllPracticeMaterials() {
     console.error('Error fetching practice materials:', error);
     throw error;
   }
+}
+
+/**
+ * Fetches practice sessions for a specific student
+ */
+export async function getStudentPracticeSessions(studentId: string, period: 'day' | 'week' | 'month' = 'month') {
+  try {
+    let view = 'practice_sessions_month';
+    
+    if (period === 'day') {
+      view = 'practice_sessions_today';
+    } else if (period === 'week') {
+      view = 'practice_sessions_week';
+    }
+    
+    const { data, error } = await supabase
+      .from(view)
+      .select('count')
+      .eq('student_id', studentId)
+      .single();
+    
+    if (error) throw error;
+    
+    return data || { count: 0 };
+  } catch (error) {
+    console.error('Error fetching student practice sessions:', error);
+    return { count: 0 };
+  }
+}
+
+/**
+ * Fetches practice stats for a specific student
+ */
+export async function getStudentPracticeStats(studentId: string) {
+  try {
+    const { data, error } = await supabase
+      .rpc('get_student_practice_stats', { student_id: studentId });
+    
+    if (error) throw error;
+    
+    return data || { 
+      total_sessions: 0, 
+      total_minutes: 0, 
+      total_points: 0,
+      average_minutes_per_session: 0
+    };
+  } catch (error) {
+    console.error('Error fetching student practice stats:', error);
+    return { 
+      total_sessions: 0, 
+      total_minutes: 0, 
+      total_points: 0,
+      average_minutes_per_session: 0
+    };
+  }
+}
+
+/**
+ * Fetches unread messages for a specific student
+ */
+export async function getStudentUnreadMessages(studentId: string) {
+  try {
+    const { data, error } = await supabase
+      .from('student_unread_messages')
+      .select('count, new_materials_count')
+      .eq('student_id', studentId)
+      .single();
+    
+    if (error) throw error;
+    
+    return data || { count: 0, new_materials_count: 0 };
+  } catch (error) {
+    console.error('Error fetching student unread messages:', error);
+    return { count: 0, new_materials_count: 0 };
+  }
+}
+
+/**
+ * Fetches fee status for a specific student
+ */
+export async function getStudentFeeStatus(studentId: string) {
+  try {
+    const { data, error } = await supabase
+      .rpc('get_student_fee_status', { student_id: studentId });
+    
+    if (error) throw error;
+    
+    return data || null;
+  } catch (error) {
+    console.error('Error fetching student fee status:', error);
+    return null;
+  }
+}
+
+/**
+ * Fetches recent activity for a specific student
+ */
+export async function getStudentRecentActivity(studentId: string) {
+  try {
+    const { data, error } = await supabase
+      .from('student_recent_activity')
+      .select('*')
+      .eq('student_id', studentId)
+      .order('started_at', { ascending: false })
+      .limit(10);
+    
+    if (error) throw error;
+    
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching student recent activity:', error);
+    return [];
+  }
 } 

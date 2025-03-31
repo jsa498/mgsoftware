@@ -40,6 +40,12 @@ export function setUserSession(user: User) {
       expires: 1, // 1 day
       path: '/'
     });
+    
+    // Set user role cookie for middleware role-based routing
+    Cookies.set('user_role', user.role, {
+      expires: 1, // 1 day
+      path: '/'
+    });
   }
 }
 
@@ -59,6 +65,7 @@ export function clearUserSession() {
   if (typeof window !== 'undefined') {
     sessionStorage.removeItem('user');
     Cookies.remove('auth_session', { path: '/' });
+    Cookies.remove('user_role', { path: '/' });
   }
 }
 
@@ -71,4 +78,10 @@ export function isAuthenticated(): boolean {
 export function isAdmin(): boolean {
   const user = getCurrentUser();
   return user !== null && user.role === 'admin';
+}
+
+// Check if user has student role
+export function isStudent(): boolean {
+  const user = getCurrentUser();
+  return user !== null && user.role === 'student';
 } 

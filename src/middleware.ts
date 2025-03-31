@@ -14,6 +14,9 @@ export function middleware(request: NextRequest) {
   // Get the session cookie that would contain user info
   const isAuthenticated = request.cookies.has('auth_session')
   
+  // Extract user role from cookie if possible (in production, you might use JWT or secure cookies)
+  const userRole = request.cookies.get('user_role')?.value || 'student' // default to student
+  
   // If user is not authenticated and trying to access a protected route, redirect to login
   if (!isAuthenticated && !isPublicPath) {
     return NextResponse.redirect(new URL('/auth/login', request.url))
@@ -21,7 +24,22 @@ export function middleware(request: NextRequest) {
   
   // If user is authenticated and trying to access login page, redirect to dashboard
   if (isAuthenticated && isPublicPath) {
-    return NextResponse.redirect(new URL('/', request.url))
+    // Redirect to appropriate dashboard based on role
+    const dashboardPath = userRole === 'admin' ? '/' : '/student-dashboard'
+    return NextResponse.redirect(new URL(dashboardPath, request.url))
+  }
+  
+  // Role-based routing for authenticated users
+  if (isAuthenticated) {
+    // Admin tries to access student dashboard
+    if (userRole === 'admin' && path === '/student-dashboard') {
+      return NextResponse.redirect(new URL('/', request.url))
+    }
+    
+    // Student tries to access admin dashboard (root path)
+    if (userRole === 'student' && path === '/' && !path.startsWith('/student-dashboard')) {
+      return NextResponse.redirect(new URL('/student-dashboard', request.url))
+    }
   }
   
   return NextResponse.next()

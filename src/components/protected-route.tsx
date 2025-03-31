@@ -2,15 +2,20 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { isAdmin, isAuthenticated } from '@/lib/auth'
+import { isAdmin, isAuthenticated, isStudent } from '@/lib/auth'
 import { Skeleton } from '@/components/ui/skeleton'
 
 interface ProtectedRouteProps {
   children: React.ReactNode
   requireAdmin?: boolean
+  requireStudent?: boolean
 }
 
-export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRouteProps) {
+export function ProtectedRoute({ 
+  children, 
+  requireAdmin = false,
+  requireStudent = false
+}: ProtectedRouteProps) {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(true)
   const [isAuthorized, setIsAuthorized] = useState(false)
@@ -23,17 +28,33 @@ export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRout
         const authenticated = isAuthenticated()
         console.log("Is authenticated:", authenticated)
         
-        // If requireAdmin is true, check if user is an admin
-        const authorized = requireAdmin ? isAdmin() : authenticated
-        console.log("Is authorized:", authorized)
+        // Check authorization based on role requirements
+        let authorized = authenticated
+        
+        if (requireAdmin) {
+          authorized = isAdmin()
+          console.log("Admin required, is admin:", authorized)
+        } else if (requireStudent) {
+          authorized = isStudent()
+          console.log("Student required, is student:", authorized)
+        }
         
         if (!authenticated) {
           console.log("Not authenticated, redirecting to login...")
           router.push('/auth/login')
         } else if (!authorized) {
-          // If user is authenticated but not authorized (not admin when admin is required)
-          console.log("Not authorized, redirecting to home...")
-          router.push('/')
+          // If user is authenticated but not authorized (wrong role)
+          console.log("Not authorized, redirecting to appropriate dashboard...")
+          if (requireAdmin) {
+            // Student trying to access admin page
+            router.push('/student-dashboard')
+          } else if (requireStudent) {
+            // Admin trying to access student page
+            router.push('/')
+          } else {
+            // Default redirect
+            router.push('/')
+          }
         } else {
           console.log("User is authorized")
           setIsAuthorized(true)
@@ -47,7 +68,7 @@ export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRout
     }
     
     checkAuth()
-  }, [router, requireAdmin])
+  }, [router, requireAdmin, requireStudent])
 
   if (isLoading) {
     return (
