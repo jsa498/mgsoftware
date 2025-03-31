@@ -248,6 +248,98 @@ export async function deleteGroup(id: string): Promise<boolean> {
 }
 
 /**
+ * Deletes a student and associated records
+ */
+export async function deleteStudent(id: string): Promise<boolean> {
+  try {
+    // Delete student records in related tables in the correct order
+    // to respect foreign key constraints
+    
+    // 1. Delete from fee_exemptions
+    const { error: feeExemptionError } = await supabase
+      .from('fee_exemptions')
+      .delete()
+      .eq('student_id', id);
+    
+    if (feeExemptionError) throw feeExemptionError;
+    
+    // 2. Delete from quiz_results
+    const { error: quizResultsError } = await supabase
+      .from('quiz_results')
+      .delete()
+      .eq('student_id', id);
+    
+    if (quizResultsError) throw quizResultsError;
+    
+    // 3. Set NULL for sender_id and recipient_id in messages
+    const { error: messagesSenderError } = await supabase
+      .from('messages')
+      .update({ sender_id: null })
+      .eq('sender_id', id);
+    
+    if (messagesSenderError) throw messagesSenderError;
+    
+    const { error: messagesRecipientError } = await supabase
+      .from('messages')
+      .update({ recipient_id: null })
+      .eq('recipient_id', id);
+    
+    if (messagesRecipientError) throw messagesRecipientError;
+    
+    // 4. Delete from users
+    const { error: userError } = await supabase
+      .from('users')
+      .delete()
+      .eq('student_id', id);
+    
+    if (userError) throw userError;
+    
+    // 5. Delete from student_groups, fees, attendance, practice_sessions
+    // These have ON DELETE CASCADE, but we'll delete them explicitly to be safe
+    const { error: studentGroupsError } = await supabase
+      .from('student_groups')
+      .delete()
+      .eq('student_id', id);
+    
+    if (studentGroupsError) throw studentGroupsError;
+    
+    const { error: feesError } = await supabase
+      .from('fees')
+      .delete()
+      .eq('student_id', id);
+    
+    if (feesError) throw feesError;
+    
+    const { error: attendanceError } = await supabase
+      .from('attendance')
+      .delete()
+      .eq('student_id', id);
+    
+    if (attendanceError) throw attendanceError;
+    
+    const { error: practiceSessionsError } = await supabase
+      .from('practice_sessions')
+      .delete()
+      .eq('student_id', id);
+    
+    if (practiceSessionsError) throw practiceSessionsError;
+    
+    // 6. Finally, delete the student record
+    const { error } = await supabase
+      .from('students')
+      .delete()
+      .eq('id', id);
+    
+    if (error) throw error;
+    
+    return true;
+  } catch (error) {
+    console.error('Error deleting student:', error);
+    return false;
+  }
+}
+
+/**
  * Gets students in a group
  */
 export async function getGroupStudents(groupId: string): Promise<Student[]> {
@@ -972,12 +1064,13 @@ export async function getStudentUnreadMessages(studentId: string) {
 }
 
 /**
- * Fetches fee status for a specific student
+ * Gets the student fee status with color coding
  */
 export async function getStudentFeeStatus(studentId: string) {
   try {
-    const { data, error } = await supabase
-      .rpc('get_student_fee_status', { student_id: studentId });
+    const { data, error } = await supabase.rpc('get_student_fee_status', {
+      p_student_id: studentId
+    });
     
     if (error) throw error;
     
@@ -1006,5 +1099,52 @@ export async function getStudentRecentActivity(studentId: string) {
   } catch (error) {
     console.error('Error fetching student recent activity:', error);
     return [];
+  }
+}
+
+/**
+ * Update fee payment period by a number of months
+ */
+export async function updateFeePaidUntil(feeId: string, months: number): Promise<boolean> {
+  try {
+    const { error } = await supabase.rpc('update_fee_paid_until', {
+      p_fee_id: feeId,
+      p_months: months
+    });
+    
+    if (error) throw error;
+    
+    return true;
+  } catch (error) {
+    console.error('Error updating fee paid until:', error);
+    return false;
+  }
+}
+
+/**
+ * Creates a fee record for a new student
+ */
+export async function createStudentFeeRecord(studentId: string, amount: number = 0): Promise<boolean> {
+  try {
+    // Set paid_until to end of current month
+    const today = new Date();
+    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    
+    const { error } = await supabase
+      .from('fees')
+      .insert([{
+        student_id: studentId,
+        amount: amount,
+        paid_until: endOfMonth.toISOString(),
+        payment_date: new Date().toISOString(),
+        status: 'paid'
+      }]);
+      
+    if (error) throw error;
+    
+    return true;
+  } catch (error) {
+    console.error('Error creating student fee record:', error);
+    return false;
   }
 } 

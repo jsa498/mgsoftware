@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, ChangeEvent } from "react";
 import Link from "next/link";
-import { PlusCircle, Search, Pencil, Trash2, Eye, EyeOff } from "lucide-react";
+import { PlusCircle, Search, Pencil, Trash2, Eye, EyeOff, AlertTriangle, MinusCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,9 +29,20 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { getAllStudents, getStudentGroups, getStudentFeeInfo, getAllGroups } from "@/lib/data-service";
+import { getAllStudents, getStudentGroups, getStudentFeeInfo, getAllGroups, deleteStudent, updateFeePaidUntil, createStudentFeeRecord } from "@/lib/data-service";
 import { Student, Group, Fee } from "@/lib/types";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/components/ui/use-toast";
@@ -55,6 +66,10 @@ export default function StudentsPage() {
   const [availableGroups, setAvailableGroups] = useState<Group[]>([]);
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isUpdatingFee, setIsUpdatingFee] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const fetchStudents = async () => {
@@ -119,6 +134,36 @@ export default function StudentsPage() {
   const formatGroupsString = (groups: Group[]) => {
     if (!groups || groups.length === 0) return "No groups";
     return groups.map(group => group.name).join(", ");
+  };
+
+  const getFeeStatusColor = (fee: Fee | null) => {
+    if (!fee) return "";
+    
+    const today = new Date();
+    const paidUntil = new Date(fee.paid_until);
+    
+    // Get current month and year
+    const currentMonth = today.getMonth();
+    const currentYear = today.getFullYear();
+    const paidMonth = paidUntil.getMonth();
+    const paidYear = paidUntil.getFullYear();
+    
+    // Create dates using only year and month for comparison
+    const currentYearMonth = new Date(currentYear, currentMonth);
+    const paidYearMonth = new Date(paidYear, paidMonth);
+    
+    // Current month (yellow)
+    if (paidMonth === currentMonth && paidYear === currentYear) {
+      return "bg-yellow-500 hover:bg-yellow-600";
+    }
+    
+    // Past due (red)
+    if (paidYearMonth < currentYearMonth) {
+      return "bg-red-500 hover:bg-red-600";
+    }
+    
+    // Future months (green)
+    return "bg-green-500 hover:bg-green-600";
   };
 
   const formatFeePaidUntil = (fee: Fee | null) => {
@@ -225,6 +270,13 @@ export default function StudentsPage() {
           }]);
           
         if (feeError) throw feeError;
+      } else {
+        // Create fee record
+        const success = await createStudentFeeRecord(studentData.id);
+        
+        if (!success) {
+          throw new Error("Failed to create fee record");
+        }
       }
       
       // Success! Refresh the student list
@@ -238,15 +290,29 @@ export default function StudentsPage() {
       setLastName("");
       setContactNumber("");
       setPin("");
+      setShowPin(false);
       setIsExemptFromFees(false);
       setSelectedGroupIds([]);
       setIsDialogOpen(false);
       
-      // Reload student list
+      // Refresh students data
       const allStudents = await getAllStudents();
       setStudents(allStudents);
       setFilteredStudents(allStudents);
       
+      // Fetch groups for new student
+      const groups = await getStudentGroups(studentData.id);
+      setStudentGroups(prev => ({
+        ...prev,
+        [studentData.id]: groups
+      }));
+      
+      // Fetch fee info for new student
+      const feeInfo = await getStudentFeeInfo(studentData.id);
+      setStudentFees(prev => ({
+        ...prev,
+        [studentData.id]: feeInfo
+      }));
     } catch (error: any) {
       console.error("Error registering student:", error);
       toast({
@@ -265,6 +331,79 @@ export default function StudentsPage() {
         ? current.filter(id => id !== groupId)
         : [...current, groupId]
     );
+  };
+
+  const handleDeleteStudent = async () => {
+    if (!studentToDelete) return;
+    
+    try {
+      setIsDeleting(true);
+      
+      const success = await deleteStudent(studentToDelete.id);
+      
+      if (success) {
+        toast({
+          title: "Student deleted",
+          description: `${studentToDelete.first_name} ${studentToDelete.last_name} has been successfully deleted.`,
+        });
+        
+        // Update the student list
+        setStudents(students.filter(s => s.id !== studentToDelete.id));
+        setFilteredStudents(filteredStudents.filter(s => s.id !== studentToDelete.id));
+      } else {
+        throw new Error("Failed to delete student");
+      }
+    } catch (error: any) {
+      console.error("Error deleting student:", error);
+      toast({
+        title: "Deletion failed",
+        description: error.message || "There was an error deleting the student.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+      setDeleteDialogOpen(false);
+      setStudentToDelete(null);
+    }
+  };
+
+  const handleFeePeriodUpdate = async (feeId: string, studentId: string, months: number) => {
+    if (!feeId) return;
+    
+    try {
+      setIsUpdatingFee(prev => ({ ...prev, [studentId]: true }));
+      
+      const success = await updateFeePaidUntil(feeId, months);
+      
+      if (success) {
+        // Refresh the fee data for this student
+        const updatedFeeInfo = await getStudentFeeInfo(studentId);
+        setStudentFees(prev => ({
+          ...prev,
+          [studentId]: updatedFeeInfo
+        }));
+        
+        toast({
+          title: "Fee status updated",
+          description: `Fee period has been ${months > 0 ? "increased" : "decreased"} by ${Math.abs(months)} month${Math.abs(months) !== 1 ? 's' : ''}.`,
+        });
+      } else {
+        toast({
+          title: "Error updating fee status",
+          description: "There was a problem updating the fee payment period.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error updating fee period:", error);
+      toast({
+        title: "Error updating fee status",
+        description: "An unexpected error occurred.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdatingFee(prev => ({ ...prev, [studentId]: false }));
+    }
   };
 
   return (
@@ -448,21 +587,82 @@ export default function StudentsPage() {
                       {formatGroupsString(studentGroups[student.id] || [])}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={studentFees[student.id] ? "default" : "outline"} className={studentFees[student.id] ? "bg-red-500" : ""}>
-                        {formatFeePaidUntil(studentFees[student.id])}
-                      </Badge>
+                      {studentFees[student.id] && (
+                        <div className="flex items-center space-x-1">
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => handleFeePeriodUpdate(studentFees[student.id]!.id, student.id, -1)}
+                            disabled={isUpdatingFee[student.id]}
+                          >
+                            <MinusCircle size={14} />
+                          </Button>
+                          <Badge 
+                            variant="default" 
+                            className={studentFees[student.id] ? getFeeStatusColor(studentFees[student.id]) : ""}
+                          >
+                            {formatFeePaidUntil(studentFees[student.id])}
+                          </Badge>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={() => handleFeePeriodUpdate(studentFees[student.id]!.id, student.id, 1)}
+                            disabled={isUpdatingFee[student.id]}
+                          >
+                            <PlusCircle size={14} />
+                          </Button>
+                        </div>
+                      )}
+                      {!studentFees[student.id] && (
+                        <Badge>—</Badge>
+                      )}
                     </TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
-                        <Button variant="ghost" size="icon" className="text-blue-500">
-                          <Pencil size={18} />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="text-red-500">
-                          <Trash2 size={18} />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="text-green-500">
-                          <PlusCircle size={18} />
-                        </Button>
+                        <AlertDialog open={deleteDialogOpen && studentToDelete?.id === student.id} onOpenChange={(open: boolean) => {
+                          setDeleteDialogOpen(open);
+                          if (!open) setStudentToDelete(null);
+                        }}>
+                          <AlertDialogTrigger asChild>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="text-red-500"
+                              onClick={() => {
+                                setStudentToDelete(student);
+                                setDeleteDialogOpen(true);
+                              }}
+                            >
+                              <Trash2 size={18} />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle className="flex items-center gap-2">
+                                <AlertTriangle className="h-5 w-5 text-red-500" />
+                                Delete Student
+                              </AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete {student.first_name} {student.last_name}? This action cannot be undone and will remove all associated data including groups, fees, and attendance records.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                                  e.preventDefault();
+                                  handleDeleteStudent();
+                                }}
+                                className="bg-red-500 hover:bg-red-600"
+                                disabled={isDeleting}
+                              >
+                                {isDeleting ? "Deleting..." : "Delete"}
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     </TableCell>
                   </TableRow>

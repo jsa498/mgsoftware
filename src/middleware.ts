@@ -40,6 +40,21 @@ export function middleware(request: NextRequest) {
     if (userRole === 'student' && path === '/' && !path.startsWith('/student-dashboard')) {
       return NextResponse.redirect(new URL('/student-dashboard', request.url))
     }
+    
+    // Student tries to access students page
+    if (userRole === 'student' && path === '/students') {
+      return NextResponse.redirect(new URL('/student-dashboard', request.url))
+    }
+    
+    // Student tries to access groups page
+    if (userRole === 'student' && path === '/groups') {
+      return NextResponse.redirect(new URL('/student-dashboard', request.url))
+    }
+    
+    // Student tries to access attendance page
+    if (userRole === 'student' && path === '/attendance') {
+      return NextResponse.redirect(new URL('/student-dashboard', request.url))
+    }
   }
   
   return NextResponse.next()

@@ -1,4 +1,5 @@
 import { Sidebar } from "@/components/sidebar"
+import { ProtectedRoute } from "@/components/protected-route"
 
 export default function AttendanceLayout({
   children,
@@ -9,7 +10,9 @@ export default function AttendanceLayout({
     <div className="flex h-screen overflow-hidden">
       <Sidebar className="hidden md:flex w-64" />
       <main className="flex-1 overflow-y-auto">
-        {children}
+        <ProtectedRoute requireAdmin={true}>
+          {children}
+        </ProtectedRoute>
       </main>
     </div>
   )
