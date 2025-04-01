@@ -23,6 +23,7 @@ import {
 import { getPracticeLeaderboard, getQuizLeaderboard, updateQuizPoints } from "@/lib/data-service";
 import { toast } from "@/components/ui/use-toast";
 import { isAdmin } from "@/lib/auth";
+import { Badge } from "@/components/ui/badge";
 
 // Define types for our leaderboard data
 type PracticeLeaderboardItem = {
@@ -220,7 +221,11 @@ export default function Leaderboard() {
                       </TableCell>
                       <TableCell>{student.name}</TableCell>
                       <TableCell>{student.time}</TableCell>
-                      <TableCell>{student.points.toLocaleString()}</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className="font-medium">
+                          {student.points.toFixed(2)}
+                        </Badge>
+                      </TableCell>
                       {isUserAdmin && (
                         <TableCell>
                           <Button variant="ghost" size="icon">

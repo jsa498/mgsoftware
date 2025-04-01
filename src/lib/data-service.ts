@@ -704,22 +704,32 @@ export async function getPracticeLeaderboard() {
         let totalPoints = 0;
         
         if (practiceData && practiceData.length > 0) {
-          totalMinutes = practiceData.reduce((sum, session) => sum + (session.duration_minutes || 0), 0);
-          totalPoints = practiceData.reduce((sum, session) => sum + (session.points || 0), 0);
+          totalMinutes = practiceData.reduce((sum, session) => {
+            // Make sure we're working with numbers
+            const mins = typeof session.duration_minutes === 'number' ? session.duration_minutes : parseInt(session.duration_minutes) || 0;
+            return sum + mins;
+          }, 0);
+          
+          totalPoints = practiceData.reduce((sum, session) => {
+            const pts = typeof session.points === 'number' ? session.points : parseFloat(session.points) || 0;
+            return sum + pts;
+          }, 0);
         }
         
         // Format time as hours and minutes
         const hours = Math.floor(totalMinutes / 60);
         const minutes = totalMinutes % 60;
-        const formattedTime = `${hours}h ${minutes.toFixed(2)}m`;
+        // Format with clock-style notation (e.g. 1:30m)
+        const formattedTime = `${hours}:${minutes.toString().padStart(2, '0')}m`;
         
         return {
           student_id: student.id,
           name: `${student.first_name} ${student.last_name}`,
           time: formattedTime,
           points: totalPoints,
+          raw_minutes: totalMinutes, // Store raw minutes for sorting
           hours, // Store raw hours for sorting
-          minutes // Store raw minutes for sorting
+          minutes: minutes // Store raw minutes for sorting
         };
       })
     );
@@ -730,16 +740,14 @@ export async function getPracticeLeaderboard() {
         return b.points - a.points;
       }
       // If points are equal, sort by time
-      if (b.hours !== a.hours) {
-        return b.hours - a.hours;
-      }
-      return b.minutes - a.minutes;
+      return b.raw_minutes - a.raw_minutes;
     });
     
     // Add rank
     return leaderboardData.map((data, index) => ({
       ...data,
-      rank: index + 1
+      rank: index + 1,
+      points: parseFloat(data.points.toFixed(2)) // Format points to 2 decimal places
     }));
   } catch (error) {
     console.error('Error fetching practice leaderboard:', error);
@@ -1019,10 +1027,13 @@ export async function getStudentPracticeSessions(studentId: string, period: 'day
 /**
  * Fetches practice stats for a specific student
  */
-export async function getStudentPracticeStats(studentId: string) {
+export async function getStudentPracticeStats(studentId: string, period: string = 'month') {
   try {
     const { data, error } = await supabase
-      .rpc('get_student_practice_stats', { student_id: studentId });
+      .rpc('get_student_practice_stats', { 
+        p_student_id: studentId,
+        p_period: period 
+      });
     
     if (error) throw error;
     
@@ -1050,13 +1061,17 @@ export async function getStudentUnreadMessages(studentId: string) {
   try {
     const { data, error } = await supabase
       .from('student_unread_messages')
-      .select('count, new_materials_count')
+      .select('count')
       .eq('student_id', studentId)
       .single();
     
     if (error) throw error;
     
-    return data || { count: 0, new_materials_count: 0 };
+    // Since new_materials_count doesn't exist in the database,
+    // we'll return it as 0 for now
+    return data 
+      ? { ...data, new_materials_count: 0 } 
+      : { count: 0, new_materials_count: 0 };
   } catch (error) {
     console.error('Error fetching student unread messages:', error);
     return { count: 0, new_materials_count: 0 };
@@ -1099,6 +1114,110 @@ export async function getStudentRecentActivity(studentId: string) {
   } catch (error) {
     console.error('Error fetching student recent activity:', error);
     return [];
+  }
+}
+
+/**
+ * Starts a new practice session for a student
+ */
+export async function startPracticeSession(studentId: string): Promise<string | null> {
+  try {
+    const { data, error } = await supabase
+      .from('practice_sessions')
+      .insert([{
+        student_id: studentId,
+        status: 'started',
+        duration_minutes: 0,
+        points: 0
+      }])
+      .select()
+      .single();
+    
+    if (error) throw error;
+    
+    return data?.id || null;
+  } catch (error) {
+    console.error('Error starting practice session:', error);
+    return null;
+  }
+}
+
+/**
+ * Updates an ongoing practice session with duration and points
+ */
+export async function updatePracticeSession(sessionId: string, durationMinutes: number): Promise<boolean> {
+  try {
+    // Calculate points (2 points per hour)
+    const points = (durationMinutes / 60) * 2;
+    
+    const { error } = await supabase
+      .from('practice_sessions')
+      .update({
+        duration_minutes: durationMinutes,
+        points: points.toFixed(2)
+      })
+      .eq('id', sessionId)
+      .eq('status', 'started');
+    
+    if (error) throw error;
+    
+    return true;
+  } catch (error) {
+    console.error('Error updating practice session:', error);
+    return false;
+  }
+}
+
+/**
+ * Completes a practice session
+ */
+export async function completePracticeSession(sessionId: string, durationMinutes: number): Promise<{ success: boolean, sessionData?: any }> {
+  try {
+    // Calculate points (2 points per hour)
+    const points = (durationMinutes / 60) * 2;
+    
+    const { data, error } = await supabase
+      .from('practice_sessions')
+      .update({
+        status: 'completed',
+        duration_minutes: Math.round(durationMinutes), // Convert to integer
+        points: points.toFixed(2),
+        completed_at: new Date().toISOString()
+      })
+      .eq('id', sessionId)
+      .eq('status', 'started')
+      .select()
+      .single();
+    
+    if (error) throw error;
+    
+    return { success: true, sessionData: data };
+  } catch (error) {
+    console.error('Error completing practice session:', error);
+    return { success: false };
+  }
+}
+
+/**
+ * Gets the current active practice session for a student, if any
+ */
+export async function getActivePracticeSession(studentId: string): Promise<any> {
+  try {
+    const { data, error } = await supabase
+      .from('practice_sessions')
+      .select('*')
+      .eq('student_id', studentId)
+      .eq('status', 'started')
+      .order('started_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    
+    if (error) throw error;
+    
+    return data || null;
+  } catch (error) {
+    console.error('Error fetching active practice session:', error);
+    return null;
   }
 }
 
@@ -1330,7 +1449,7 @@ export async function getStudentPracticeMaterials(studentId: string) {
           .filter(ma => ma.practice_material_id === material.id)
           .map(ma => ({ 
             id: ma.group_id, 
-            name: ma.groups?.name || 'Unnamed Group' 
+            name: ma.groups && 'name' in ma.groups ? ma.groups.name : 'Unnamed Group' 
           }));
         
         return {
@@ -1420,7 +1539,9 @@ export async function getAllQuizzes(): Promise<Quiz[]> {
 
         return {
           ...quiz,
-          groups: groupAssociations?.map(association => association.groups) || []
+          groups: groupAssociations?.map(association => 
+            association.groups && typeof association.groups === 'object' ? association.groups : { id: '', name: 'Unknown Group' }
+          ) || []
         };
       })
     );
@@ -1455,7 +1576,9 @@ export async function getQuizById(quizId: string): Promise<Quiz | null> {
 
     return {
       ...quiz,
-      groups: groupAssociations?.map(association => association.groups) || []
+      groups: groupAssociations?.map(association => 
+        association.groups && typeof association.groups === 'object' ? association.groups : { id: '', name: 'Unknown Group' }
+      ) || []
     };
   } catch (error) {
     console.error('Error fetching quiz:', error);
@@ -1488,7 +1611,7 @@ export async function getStudentQuizzes(studentId: string): Promise<Quiz[]> {
       .select(`
         quiz_id,
         group_id,
-        groups(name)
+        groups(id, name)
       `)
       .in('group_id', groupIds);
     
@@ -1499,7 +1622,7 @@ export async function getStudentQuizzes(studentId: string): Promise<Quiz[]> {
     }
     
     // Get unique quiz IDs
-    const quizIds = [...new Set(quizAssociations.map(m => m.quiz_id))];
+    const quizIds = [...new Set(quizAssociations.map(q => q.quiz_id))];
     
     // Get the actual quizzes
     const { data: quizzes, error: quizzesDataError } = await supabase
@@ -1519,10 +1642,18 @@ export async function getStudentQuizzes(studentId: string): Promise<Quiz[]> {
       quizzes.map(async (quiz) => {
         const groupsForQuiz = quizAssociations
           .filter(qa => qa.quiz_id === quiz.id)
-          .map(qa => ({ 
-            id: qa.group_id, 
-            name: qa.groups?.name || 'Unnamed Group' 
-          }));
+          .map(qa => {
+            if (qa.groups && typeof qa.groups === 'object' && 'name' in qa.groups) {
+              return {
+                id: qa.group_id,
+                name: qa.groups.name
+              };
+            }
+            return {
+              id: qa.group_id,
+              name: 'Unnamed Group'
+            };
+          });
         
         return {
           ...quiz,

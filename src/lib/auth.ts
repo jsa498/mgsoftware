@@ -46,6 +46,13 @@ export function setUserSession(user: User) {
         sameSite: 'strict'
       });
       
+      // Set user ID cookie for server-side identification
+      Cookies.set('user_id', user.id.toString(), {
+        expires: 1, // 1 day
+        path: '/',
+        sameSite: 'strict'
+      });
+      
       // Set user role cookie for middleware role-based routing
       Cookies.set('user_role', user.role, {
         expires: 1, // 1 day
@@ -90,6 +97,7 @@ export function clearUserSession() {
       
       // Remove auth cookies
       Cookies.remove('auth_session', { path: '/' });
+      Cookies.remove('user_id', { path: '/' });
       Cookies.remove('user_role', { path: '/' });
     } catch (error) {
       console.error('Error clearing user session:', error);

@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { PlayIcon, PauseIcon, MinusIcon, PlusIcon, ChevronLeftIcon, ChevronRightIcon, VolumeIcon } from "lucide-react"
+import { useState, useEffect, useRef } from "react"
+import { PlayIcon, PauseIcon, MinusIcon, PlusIcon, ChevronLeftIcon, ChevronRightIcon, VolumeIcon, Timer } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
 import {
@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import {
   Tooltip,
@@ -20,6 +20,18 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { Badge } from "@/components/ui/badge"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { startPracticeSession, updatePracticeSession, completePracticeSession, getActivePracticeSession } from "@/lib/data-service"
+import { useToast } from "@/components/ui/use-toast"
+import { getCurrentUser } from "@/lib/auth"
+import { getStudentProfileByUserId } from "@/lib/data-service"
 
 const notes = ["A", "A#", "B", "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#"]
 
@@ -33,6 +45,187 @@ export default function PracticeToolsPage() {
     tanpura: 50,
     tabla: 50,
   })
+  
+  // Practice session state
+  const [practiceTime, setPracticeTime] = useState(0) // time in seconds
+  const [practicePoints, setPracticePoints] = useState(0)
+  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [practiceCompleted, setPracticeCompleted] = useState(false)
+  const [completionData, setCompletionData] = useState<any>(null)
+  
+  // Timer ref to store interval ID
+  const timerRef = useRef<NodeJS.Timeout | null>(null)
+  
+  const { toast } = useToast()
+  
+  // Format practice time as HH:MM:SS
+  const formatTime = (timeInSeconds: number) => {
+    const hours = Math.floor(timeInSeconds / 3600)
+    const minutes = Math.floor((timeInSeconds % 3600) / 60)
+    const seconds = timeInSeconds % 60
+    
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+  }
+  
+  // Calculate points from practice time (2 points per hour)
+  const calculatePoints = (timeInSeconds: number) => {
+    return (timeInSeconds / 3600) * 2
+  }
+
+  // Check for existing practice session on mount
+  useEffect(() => {
+    const checkExistingSession = async () => {
+      try {
+        const user = await getCurrentUser()
+        if (user && user.role === 'student') {
+          // Get student profile to get student_id
+          const studentProfile = await getStudentProfileByUserId(user.id)
+          if (studentProfile?.id) {
+            const session = await getActivePracticeSession(studentProfile.id)
+            if (session) {
+              setSessionId(session.id)
+              // Calculate elapsed time from started_at to now
+              const startedAt = new Date(session.started_at)
+              const now = new Date()
+              const elapsedSeconds = Math.floor((now.getTime() - startedAt.getTime()) / 1000)
+              setPracticeTime(elapsedSeconds)
+              setPracticePoints(calculatePoints(elapsedSeconds))
+              setIsPlaying(true)
+              startTimer()
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error checking for existing session:', error)
+      }
+    }
+    
+    checkExistingSession()
+    
+    // Cleanup timer on component unmount
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current)
+      }
+    }
+  }, [])
+  
+  // Start the timer for practice session
+  const startTimer = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current)
+    }
+    
+    timerRef.current = setInterval(() => {
+      setPracticeTime(prev => {
+        const newTime = prev + 1
+        // Update points (2 points per hour)
+        setPracticePoints(calculatePoints(newTime))
+        
+        // Update session in database every minute
+        if (newTime % 60 === 0 && sessionId) {
+          updatePracticeSession(sessionId, Math.floor(newTime / 60))
+            .catch(err => console.error('Error updating session:', err))
+        }
+        
+        return newTime
+      })
+    }, 1000)
+  }
+  
+  // Stop the timer
+  const stopTimer = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current)
+      timerRef.current = null
+    }
+  }
+  
+  // Start practice session
+  const handleStartPractice = async () => {
+    try {
+      const user = await getCurrentUser()
+      if (!user || user.role !== 'student') {
+        toast({
+          title: "Authentication Error",
+          description: "You must be logged in as a student to practice.",
+          variant: "destructive",
+        })
+        return
+      }
+      
+      // Get student profile to get student_id
+      const studentProfile = await getStudentProfileByUserId(user.id)
+      if (!studentProfile?.id) {
+        toast({
+          title: "Profile Error",
+          description: "Could not find your student profile. Please contact support.",
+          variant: "destructive",
+        })
+        return
+      }
+      
+      const id = await startPracticeSession(studentProfile.id)
+      if (id) {
+        setSessionId(id)
+        setPracticeTime(0)
+        setPracticePoints(0)
+        setIsPlaying(true)
+        startTimer()
+        
+        toast({
+          title: "Practice Started",
+          description: "Your practice session has started. The timer is now running.",
+        })
+      }
+    } catch (error) {
+      console.error('Error starting practice:', error)
+      toast({
+        title: "Error",
+        description: "Failed to start practice. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+  
+  // Stop practice session
+  const handleStopPractice = async () => {
+    try {
+      if (!sessionId) return
+      
+      stopTimer()
+      setIsPlaying(false)
+      
+      // Convert seconds to minutes (rounding up to nearest 0.01)
+      const durationMinutes = Math.ceil(practiceTime / 60 * 100) / 100
+      
+      const result = await completePracticeSession(sessionId, durationMinutes)
+      if (result.success) {
+        setCompletionData({
+          duration: formatTime(practiceTime),
+          points: practicePoints.toFixed(2),
+          durationMinutes,
+        })
+        setPracticeCompleted(true)
+        setSessionId(null)
+      }
+    } catch (error) {
+      console.error('Error stopping practice:', error)
+      toast({
+        title: "Error",
+        description: "Failed to complete practice. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+  
+  // Close the completion dialog
+  const handleCloseCompletion = () => {
+    setPracticeCompleted(false)
+    setCompletionData(null)
+    setPracticeTime(0)
+    setPracticePoints(0)
+  }
 
   // Function to handle volume change
   const handleVolumeChange = (type: keyof typeof volumes, value: number[]) => {
@@ -73,13 +266,35 @@ export default function PracticeToolsPage() {
 
   // Function to toggle play/pause
   const togglePlay = () => {
-    setIsPlaying(!isPlaying)
+    if (isPlaying) {
+      handleStopPractice()
+    } else {
+      handleStartPractice()
+    }
   }
 
   return (
     <TooltipProvider>
       <div className="container mx-auto px-4 py-8 max-w-3xl">
-        <div className="flex flex-col items-center space-y-8">          
+        <div className="flex flex-col items-center space-y-8">
+          {/* Practice Timer Display */}
+          {isPlaying && (
+            <Card className="w-full">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-center">Practice Session</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col items-center space-y-4">
+                <div className="text-4xl font-bold">{formatTime(practiceTime)}</div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Points:</span>
+                  <Badge variant="secondary" className="text-lg px-3 py-1">
+                    {practicePoints.toFixed(2)}
+                  </Badge>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          
           <Tooltip>
             <TooltipTrigger asChild>
               <Button 
@@ -342,6 +557,56 @@ export default function PracticeToolsPage() {
           </Tooltip>
         </div>
       </div>
+      
+      {/* Practice Completion Dialog */}
+      <Dialog open={practiceCompleted} onOpenChange={setPracticeCompleted}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Practice Session Completed</DialogTitle>
+            <DialogDescription>
+              Great job! Here's a summary of your practice session.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {completionData && (
+            <div className="flex flex-col items-center space-y-4 py-4">
+              <div className="grid grid-cols-2 gap-4 w-full">
+                <Card>
+                  <CardHeader className="p-4 pb-2">
+                    <CardTitle className="text-sm text-center">Practice Time</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4 pt-0">
+                    <p className="text-2xl font-bold text-center">{completionData.duration}</p>
+                  </CardContent>
+                </Card>
+                
+                <Card>
+                  <CardHeader className="p-4 pb-2">
+                    <CardTitle className="text-sm text-center">Points Earned</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4 pt-0">
+                    <p className="text-2xl font-bold text-center">{completionData.points}</p>
+                  </CardContent>
+                </Card>
+              </div>
+              
+              <p className="text-center text-muted-foreground text-sm">
+                Your progress has been saved and added to the leaderboard.
+              </p>
+            </div>
+          )}
+          
+          <DialogFooter className="flex justify-center sm:justify-center">
+            <Button 
+              type="button" 
+              onClick={handleCloseCompletion}
+              className="w-full sm:w-auto"
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </TooltipProvider>
   )
 } 
