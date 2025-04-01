@@ -6,6 +6,8 @@ import { format } from "date-fns"
 import { ArrowLeft, Send, Loader2 } from "lucide-react"
 
 import { getGroupMessages, sendGroupMessage, markMessagesAsRead, getAllGroups } from "@/lib/data-service"
+import { getCurrentUser } from "@/lib/auth"
+import { supabase } from "@/lib/supabase"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -18,6 +20,8 @@ interface Message {
   body: string
   created_at: string
   is_read: boolean
+  subject?: string
+  isAdminMessage?: boolean
   sender?: {
     id: string
     first_name: string
@@ -40,12 +44,44 @@ export default function GroupChatPage() {
   const [group, setGroup] = useState<Group | null>(null)
   const [newMessage, setNewMessage] = useState("")
   const [error, setError] = useState<string | null>(null)
+  const [currentStudentId, setCurrentStudentId] = useState<string | null>(null)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const scrollAreaRef = useRef<HTMLDivElement>(null)
 
-  // Mock user id - in a real app, you would get this from authentication
-  const currentUserId = "current-user-id"
+  // Get authenticated user's info
+  useEffect(() => {
+    async function fetchCurrentUserInfo() {
+      const user = getCurrentUser()
+      if (user) {
+        setCurrentUserId(user.id.toString())
+        setIsAdmin(user.role === 'admin')
+        
+        try {
+          const { data, error } = await supabase
+            .from('users')
+            .select('student_id')
+            .eq('id', user.id)
+            .single()
+          
+          if (error) {
+            console.error("Error fetching student ID:", error)
+            return
+          }
+          
+          if (data && data.student_id) {
+            setCurrentStudentId(data.student_id)
+          }
+        } catch (err) {
+          console.error("Error fetching student ID:", err)
+        }
+      }
+    }
+    
+    fetchCurrentUserInfo()
+  }, [])
 
   useEffect(() => {
     async function loadGroupInfo() {
@@ -95,15 +131,32 @@ export default function GroupChatPage() {
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!newMessage.trim()) return
+    if (!newMessage.trim() || (!currentStudentId && !isAdmin)) return
     
     try {
       setSending(true)
-      const sentMessage = await sendGroupMessage(groupId, currentUserId, newMessage)
       
-      if (sentMessage) {
-        setMessages(prev => [...prev, sentMessage])
-        setNewMessage("")
+      // If admin user, use the admin mode of message sending
+      if (isAdmin && !currentStudentId) {
+        const sentMessage = await sendGroupMessage(groupId, "", newMessage, true)
+        
+        if (sentMessage) {
+          // Add admin identifier to the message for UI display purposes
+          const messageWithAdminInfo = {
+            ...sentMessage,
+            isAdminMessage: true
+          }
+          setMessages(prev => [...prev, messageWithAdminInfo])
+          setNewMessage("")
+        }
+      } else {
+        // Regular student message
+        const sentMessage = await sendGroupMessage(groupId, currentStudentId!, newMessage)
+        
+        if (sentMessage) {
+          setMessages(prev => [...prev, sentMessage])
+          setNewMessage("")
+        }
       }
     } catch (err) {
       console.error("Error sending message:", err)
@@ -175,46 +228,56 @@ export default function GroupChatPage() {
                     {date}
                   </div>
                 </div>
-                {dateMessages.map(message => (
-                  <div 
-                    key={message.id} 
-                    className={`flex ${message.sender_id === currentUserId ? 'justify-end' : 'justify-start'}`}
-                  >
-                    <div className={`flex max-w-[70%] ${message.sender_id === currentUserId ? 'flex-row-reverse' : 'flex-row'}`}>
-                      {message.sender_id !== currentUserId && (
-                        <div className="mr-3 mt-1">
-                          <Avatar className="h-8 w-8">
-                            <AvatarImage src="" />
-                            <AvatarFallback>
-                              {message.sender ? message.sender.first_name.charAt(0) + message.sender.last_name.charAt(0) : "UN"}
-                            </AvatarFallback>
-                          </Avatar>
-                        </div>
-                      )}
-                      <div>
-                        <div className="flex items-end gap-2 mb-1">
-                          {message.sender_id !== currentUserId && (
-                            <span className="text-sm font-medium">
-                              {message.sender ? `${message.sender.first_name} ${message.sender.last_name}` : "Unknown"}
+                {dateMessages.map(message => {
+                  // Handle admin messages (null sender_id with subject 'Admin Message')
+                  const isAdminMessage = message.subject === 'Admin Message' || message.isAdminMessage;
+                  
+                  const isCurrentUserMessage = 
+                    (currentStudentId && message.sender_id === currentStudentId) || 
+                    (isAdmin && !currentStudentId && isAdminMessage);
+                    
+                  return (
+                    <div 
+                      key={message.id} 
+                      className={`flex ${isCurrentUserMessage ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div className={`flex max-w-[70%] ${isCurrentUserMessage ? 'flex-row-reverse' : 'flex-row'}`}>
+                        {!isCurrentUserMessage && (
+                          <div className="mr-3 mt-1">
+                            <Avatar className="h-8 w-8">
+                              <AvatarImage src="" />
+                              <AvatarFallback>
+                                {message.sender ? message.sender.first_name.charAt(0) + message.sender.last_name.charAt(0) : "UN"}
+                              </AvatarFallback>
+                            </Avatar>
+                          </div>
+                        )}
+                        <div>
+                          <div className="flex items-end gap-2 mb-1">
+                            {!isCurrentUserMessage && (
+                              <span className="text-sm font-medium">
+                                {message.sender ? `${message.sender.first_name} ${message.sender.last_name}` : 
+                                  isAdminMessage ? 'Admin' : 'Unknown'}
+                              </span>
+                            )}
+                            <span className="text-xs text-muted-foreground">
+                              {formatMessageTime(message.created_at)}
                             </span>
-                          )}
-                          <span className="text-xs text-muted-foreground">
-                            {formatMessageTime(message.created_at)}
-                          </span>
-                        </div>
-                        <div 
-                          className={`p-3 rounded-lg ${
-                            message.sender_id === currentUserId 
-                              ? 'bg-primary text-primary-foreground' 
-                              : 'bg-muted'
-                          }`}
-                        >
-                          {message.body}
+                          </div>
+                          <div 
+                            className={`p-3 rounded-lg ${
+                              isCurrentUserMessage 
+                                ? 'bg-primary text-primary-foreground' 
+                                : 'bg-muted'
+                            }`}
+                          >
+                            {message.body}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             ))}
             <div ref={messagesEndRef} />
@@ -230,14 +293,17 @@ export default function GroupChatPage() {
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             className="flex-1"
-            disabled={sending}
+            disabled={sending || (!currentStudentId && !isAdmin)}
           />
-          <Button type="submit" size="icon" disabled={sending || !newMessage.trim()}>
+          <Button type="submit" size="icon" disabled={sending || !newMessage.trim() || (!currentStudentId && !isAdmin)}>
             {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </Button>
         </form>
         {error && (
           <p className="text-destructive text-xs mt-2">{error}</p>
+        )}
+        {!currentStudentId && !isAdmin && !loading && (
+          <p className="text-amber-500 text-xs mt-2">You need to be logged in as a student or admin to send messages</p>
         )}
       </div>
     </div>

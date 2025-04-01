@@ -461,24 +461,47 @@ export async function getGroupMessages(groupId: string) {
 /**
  * Sends a message to a group
  */
-export async function sendGroupMessage(groupId: string, senderId: string, message: string) {
+export async function sendGroupMessage(groupId: string, senderId: string, message: string, isAdmin: boolean = false) {
   try {
-    const { data, error } = await supabase
-      .from('messages')
-      .insert([
-        {
-          group_id: groupId,
-          sender_id: senderId,
-          body: message,
-          is_read: false
-        }
-      ])
-      .select()
-      .single();
-    
-    if (error) throw error;
-    
-    return data;
+    // For admin messages, use a different approach to bypass the foreign key constraint
+    if (isAdmin) {
+      // Admin messages will have null sender_id to avoid foreign key constraint
+      const { data, error } = await supabase
+        .from('messages')
+        .insert([
+          {
+            group_id: groupId,
+            sender_id: null, // Using null for admin messages
+            body: message,
+            is_read: false,
+            subject: 'Admin Message' // Use subject field to identify admin messages
+          }
+        ])
+        .select()
+        .single();
+      
+      if (error) throw error;
+      
+      return data;
+    } else {
+      // Regular student messages, keep the existing logic
+      const { data, error } = await supabase
+        .from('messages')
+        .insert([
+          {
+            group_id: groupId,
+            sender_id: senderId,
+            body: message,
+            is_read: false
+          }
+        ])
+        .select()
+        .single();
+      
+      if (error) throw error;
+      
+      return data;
+    }
   } catch (error) {
     console.error('Error sending message:', error);
     return null;
@@ -1059,19 +1082,37 @@ export async function getStudentPracticeStats(studentId: string, period: string 
  */
 export async function getStudentUnreadMessages(studentId: string) {
   try {
-    const { data, error } = await supabase
-      .from('student_unread_messages')
-      .select('count')
-      .eq('student_id', studentId)
-      .single();
+    // First get all groups that the student is a member of
+    const { data: studentGroups, error: groupsError } = await supabase
+      .from('student_groups')
+      .select('group_id')
+      .eq('student_id', studentId);
     
-    if (error) throw error;
+    if (groupsError) throw groupsError;
+    
+    // If no groups found, return 0 counts
+    if (!studentGroups || studentGroups.length === 0) {
+      return { count: 0, new_materials_count: 0 };
+    }
+    
+    // Extract group IDs
+    const groupIds = studentGroups.map(g => g.group_id);
+    
+    // Count unread messages across all student's groups
+    const { count: unreadCount, error: countError } = await supabase
+      .from('messages')
+      .select('*', { count: 'exact', head: true })
+      .in('group_id', groupIds)
+      .eq('is_read', false);
+    
+    if (countError) throw countError;
     
     // Since new_materials_count doesn't exist in the database,
     // we'll return it as 0 for now
-    return data 
-      ? { ...data, new_materials_count: 0 } 
-      : { count: 0, new_materials_count: 0 };
+    return { 
+      count: unreadCount || 0, 
+      new_materials_count: 0 
+    };
   } catch (error) {
     console.error('Error fetching student unread messages:', error);
     return { count: 0, new_materials_count: 0 };
