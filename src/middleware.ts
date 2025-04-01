@@ -60,6 +60,11 @@ export function middleware(request: NextRequest) {
     if (userRole === 'student' && path === '/practice/upload') {
       return NextResponse.redirect(new URL('/practice/media', request.url))
     }
+    
+    // Student tries to access quiz creation page
+    if (userRole === 'student' && path === '/practice/quiz') {
+      return NextResponse.redirect(new URL('/practice/quizzes', request.url))
+    }
   }
   
   return NextResponse.next()

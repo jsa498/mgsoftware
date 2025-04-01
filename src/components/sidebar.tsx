@@ -65,8 +65,8 @@ export function Sidebar({ className, ...props }: SidebarProps) {
           icon: Library,
         },
         {
-          name: "Create Quiz",
-          href: "/practice/quiz",
+          name: "Quizzes",
+          href: "/practice/quizzes",
           icon: FileText,
         }
       ];
