@@ -17,7 +17,8 @@ import {
   FileText,
   ChevronDown,
   ChevronRight,
-  UserIcon
+  UserIcon,
+  Library
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -33,23 +34,42 @@ export function Sidebar({ className, ...props }: SidebarProps) {
   const [practiceOpen, setPracticeOpen] = useState(false)
   const isUserAdmin = isAdmin()
   
-  const practiceSubItems = [
-    {
-      name: "Practice Tools",
-      href: "/practice/tools",
-      icon: BookOpen,
-    },
-    {
-      name: "Upload Practice",
-      href: "/practice/upload",
-      icon: Upload,
-    },
-    {
-      name: "Create Quiz",
-      href: "/practice/quiz",
-      icon: FileText,
-    }
-  ]
+  // Define practice sub-items based on user role
+  const practiceSubItems = isUserAdmin 
+    ? [
+        {
+          name: "Practice Tools",
+          href: "/practice/tools",
+          icon: BookOpen,
+        },
+        {
+          name: "Upload Practice",
+          href: "/practice/upload",
+          icon: Upload,
+        },
+        {
+          name: "Create Quiz",
+          href: "/practice/quiz",
+          icon: FileText,
+        }
+      ]
+    : [
+        {
+          name: "Practice Tools",
+          href: "/practice/tools",
+          icon: BookOpen,
+        },
+        {
+          name: "Practice Media",
+          href: "/practice/media",
+          icon: Library,
+        },
+        {
+          name: "Create Quiz",
+          href: "/practice/quiz",
+          icon: FileText,
+        }
+      ];
 
   // Routes for admin users (unchanged)
   const adminRoutes = [

@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { DashboardStats, FeeAlert, RecentActivity, Student, Group } from './types';
+import { DashboardStats, FeeAlert, RecentActivity, Student, Group, Message, PracticeMaterial, Fee, Attendance, StudentAttendance, Quiz, QuizQuestion, QuizResult, QuizAttachment } from './types';
 
 /**
  * Fetches dashboard statistics
@@ -1269,5 +1269,271 @@ export async function updateProfileImage(studentId: string, file: File): Promise
   } catch (error) {
     console.error('Error updating profile image:', error);
     return null;
+  }
+}
+
+/**
+ * Gets practice materials available to a specific student based on their group memberships
+ */
+export async function getStudentPracticeMaterials(studentId: string) {
+  try {
+    // Get all groups the student belongs to
+    const { data: studentGroups, error: groupsError } = await supabase
+      .from('student_groups')
+      .select('group_id')
+      .eq('student_id', studentId);
+    
+    if (groupsError) throw groupsError;
+    
+    if (!studentGroups || studentGroups.length === 0) {
+      return []; // Student doesn't belong to any groups
+    }
+    
+    const groupIds = studentGroups.map(g => g.group_id);
+    
+    // Get all practice materials shared with these groups
+    const { data: materialAssociations, error: materialsError } = await supabase
+      .from('practice_material_groups')
+      .select(`
+        practice_material_id,
+        group_id,
+        groups(name)
+      `)
+      .in('group_id', groupIds);
+    
+    if (materialsError) throw materialsError;
+    
+    if (!materialAssociations || materialAssociations.length === 0) {
+      return []; // No materials shared with student's groups
+    }
+    
+    // Get unique material IDs
+    const materialIds = [...new Set(materialAssociations.map(m => m.practice_material_id))];
+    
+    // Get the actual materials
+    const { data: materials, error: materialsDataError } = await supabase
+      .from('practice_materials')
+      .select('*')
+      .in('id', materialIds)
+      .order('created_at', { ascending: false });
+    
+    if (materialsDataError) throw materialsDataError;
+    
+    if (!materials || materials.length === 0) {
+      return [];
+    }
+    
+    // For each material, add the groups it's shared with
+    const materialsWithGroups = await Promise.all(
+      materials.map(async (material) => {
+        const groupsForMaterial = materialAssociations
+          .filter(ma => ma.practice_material_id === material.id)
+          .map(ma => ({ 
+            id: ma.group_id, 
+            name: ma.groups?.name || 'Unnamed Group' 
+          }));
+        
+        return {
+          ...material,
+          groups: groupsForMaterial
+        };
+      })
+    );
+    
+    return materialsWithGroups;
+  } catch (error) {
+    console.error('Error fetching student practice materials:', error);
+    return [];
+  }
+}
+
+/**
+ * Creates a new quiz
+ */
+export async function createQuiz(quizData: {
+  title: string;
+  time_limit: number;
+  passing_score: number;
+  content: QuizQuestion[];
+  groupIds?: string[];
+  attachment?: QuizAttachment;
+}): Promise<Quiz | null> {
+  try {
+    // First create the quiz
+    const { data: quiz, error } = await supabase
+      .from('quizzes')
+      .insert([{ 
+        title: quizData.title, 
+        time_limit: quizData.time_limit,
+        passing_score: quizData.passing_score,
+        content: quizData.content,
+        attachment: quizData.attachment || null
+      }])
+      .select('*')
+      .single();
+    
+    if (error) throw error;
+    
+    // If we have group IDs, share with those groups
+    if (quizData.groupIds && quizData.groupIds.length > 0 && quiz) {
+      const groupAssociations = quizData.groupIds.map(groupId => ({
+        quiz_id: quiz.id,
+        group_id: groupId
+      }));
+      
+      const { error: sharingError } = await supabase
+        .from('quiz_groups')
+        .insert(groupAssociations);
+      
+      if (sharingError) throw sharingError;
+    }
+    
+    return quiz;
+  } catch (error) {
+    console.error('Error creating quiz:', error);
+    throw error;
+  }
+}
+
+/**
+ * Gets all quizzes with their associated groups
+ */
+export async function getAllQuizzes(): Promise<Quiz[]> {
+  try {
+    const { data: quizzes, error } = await supabase
+      .from('quizzes')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    if (!quizzes || quizzes.length === 0) return [];
+
+    const quizzesWithGroups = await Promise.all(
+      quizzes.map(async (quiz) => {
+        const { data: groupAssociations, error: groupError } = await supabase
+          .from('quiz_groups')
+          .select('group_id, groups(id, name)')
+          .eq('quiz_id', quiz.id);
+
+        if (groupError) throw groupError;
+
+        return {
+          ...quiz,
+          groups: groupAssociations?.map(association => association.groups) || []
+        };
+      })
+    );
+
+    return quizzesWithGroups;
+  } catch (error) {
+    console.error('Error fetching quizzes:', error);
+    throw error;
+  }
+}
+
+/**
+ * Gets a single quiz by ID
+ */
+export async function getQuizById(quizId: string): Promise<Quiz | null> {
+  try {
+    const { data: quiz, error } = await supabase
+      .from('quizzes')
+      .select('*')
+      .eq('id', quizId)
+      .single();
+
+    if (error) throw error;
+
+    // Get groups this quiz is shared with
+    const { data: groupAssociations, error: groupError } = await supabase
+      .from('quiz_groups')
+      .select('group_id, groups(id, name)')
+      .eq('quiz_id', quizId);
+
+    if (groupError) throw groupError;
+
+    return {
+      ...quiz,
+      groups: groupAssociations?.map(association => association.groups) || []
+    };
+  } catch (error) {
+    console.error('Error fetching quiz:', error);
+    throw error;
+  }
+}
+
+/**
+ * Gets all quizzes accessible to a student based on their group memberships
+ */
+export async function getStudentQuizzes(studentId: string): Promise<Quiz[]> {
+  try {
+    // Get all groups the student belongs to
+    const { data: studentGroups, error: groupsError } = await supabase
+      .from('student_groups')
+      .select('group_id')
+      .eq('student_id', studentId);
+    
+    if (groupsError) throw groupsError;
+    
+    if (!studentGroups || studentGroups.length === 0) {
+      return []; // Student doesn't belong to any groups
+    }
+    
+    const groupIds = studentGroups.map(g => g.group_id);
+    
+    // Get all quizzes shared with these groups
+    const { data: quizAssociations, error: quizzesError } = await supabase
+      .from('quiz_groups')
+      .select(`
+        quiz_id,
+        group_id,
+        groups(name)
+      `)
+      .in('group_id', groupIds);
+    
+    if (quizzesError) throw quizzesError;
+    
+    if (!quizAssociations || quizAssociations.length === 0) {
+      return []; // No quizzes shared with student's groups
+    }
+    
+    // Get unique quiz IDs
+    const quizIds = [...new Set(quizAssociations.map(m => m.quiz_id))];
+    
+    // Get the actual quizzes
+    const { data: quizzes, error: quizzesDataError } = await supabase
+      .from('quizzes')
+      .select('*')
+      .in('id', quizIds)
+      .order('created_at', { ascending: false });
+    
+    if (quizzesDataError) throw quizzesDataError;
+    
+    if (!quizzes || quizzes.length === 0) {
+      return [];
+    }
+    
+    // For each quiz, add the groups it's shared with
+    const quizzesWithGroups = await Promise.all(
+      quizzes.map(async (quiz) => {
+        const groupsForQuiz = quizAssociations
+          .filter(qa => qa.quiz_id === quiz.id)
+          .map(qa => ({ 
+            id: qa.group_id, 
+            name: qa.groups?.name || 'Unnamed Group' 
+          }));
+        
+        return {
+          ...quiz,
+          groups: groupsForQuiz
+        };
+      })
+    );
+    
+    return quizzesWithGroups;
+  } catch (error) {
+    console.error('Error fetching student quizzes:', error);
+    return [];
   }
 } 

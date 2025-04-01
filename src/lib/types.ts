@@ -119,4 +119,45 @@ export type StudentAttendance = {
   name: string;
   contact: string;
   attendance: Record<number, boolean | null>;
+};
+
+export type QuizQuestion = {
+  question: string;
+  options: string[];
+  correctAnswer: number;
+};
+
+export type QuizAttachment = {
+  file_url: string;
+  file_name: string;
+  file_type: string;
+  file_size: number;
+};
+
+export type Quiz = {
+  id: string;
+  title: string;
+  time_limit: number;
+  passing_score: number;
+  content: QuizQuestion[];
+  attachment?: QuizAttachment;
+  created_at: string;
+  updated_at: string;
+  groups?: Group[];
+};
+
+export type QuizGroup = {
+  id: string;
+  quiz_id: string;
+  group_id: string;
+  created_at: string;
+};
+
+export type QuizResult = {
+  id: string;
+  student_id: string;
+  quiz_id: string;
+  score: number;
+  completed_at: string;
+  created_at: string;
 }; 

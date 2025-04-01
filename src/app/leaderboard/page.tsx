@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/table";
 import { getPracticeLeaderboard, getQuizLeaderboard, updateQuizPoints } from "@/lib/data-service";
 import { toast } from "@/components/ui/use-toast";
+import { isAdmin } from "@/lib/auth";
 
 // Define types for our leaderboard data
 type PracticeLeaderboardItem = {
@@ -44,10 +45,13 @@ export default function Leaderboard() {
   const [practiceData, setPracticeData] = useState<PracticeLeaderboardItem[]>([]);
   const [quizData, setQuizData] = useState<QuizLeaderboardItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isUserAdmin, setIsUserAdmin] = useState(false);
   
   // Fetch leaderboard data on component mount
   useEffect(() => {
     fetchLeaderboardData();
+    // Check if the current user is an admin
+    setIsUserAdmin(isAdmin());
   }, []);
   
   // Function to fetch leaderboard data
@@ -150,12 +154,16 @@ export default function Leaderboard() {
           <Button variant="outline" onClick={fetchLeaderboardData}>
             <RefreshCw className="h-4 w-4 mr-2" /> Refresh
           </Button>
-          <Button onClick={handleCalibratePoints}>
-            Calibrate Points
-          </Button>
-          <Button variant="destructive" onClick={handleResetAll}>
-            Reset All Points & Time
-          </Button>
+          {isUserAdmin && (
+            <>
+              <Button onClick={handleCalibratePoints}>
+                Calibrate Points
+              </Button>
+              <Button variant="destructive" onClick={handleResetAll}>
+                Reset All Points & Time
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -176,13 +184,15 @@ export default function Leaderboard() {
                   <TableHead>Student</TableHead>
                   <TableHead>Practice Time</TableHead>
                   <TableHead>Practice Points</TableHead>
-                  <TableHead className="w-[50px]"></TableHead>
+                  {isUserAdmin && (
+                    <TableHead className="w-[50px]"></TableHead>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredPracticeData.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8">
+                    <TableCell colSpan={isUserAdmin ? 5 : 4} className="text-center py-8">
                       {practiceData.length === 0
                         ? "No practice data available."
                         : "No students match your search query."}
@@ -211,11 +221,13 @@ export default function Leaderboard() {
                       <TableCell>{student.name}</TableCell>
                       <TableCell>{student.time}</TableCell>
                       <TableCell>{student.points.toLocaleString()}</TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="icon">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
+                      {isUserAdmin && (
+                        <TableCell>
+                          <Button variant="ghost" size="icon">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))
                 )}
@@ -234,13 +246,15 @@ export default function Leaderboard() {
                   <TableHead className="w-[100px]">Rank</TableHead>
                   <TableHead>Student</TableHead>
                   <TableHead>Quiz Points</TableHead>
-                  <TableHead className="w-[130px]">Actions</TableHead>
+                  {isUserAdmin && (
+                    <TableHead className="w-[130px]">Actions</TableHead>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredQuizData.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center py-8">
+                    <TableCell colSpan={isUserAdmin ? 4 : 3} className="text-center py-8">
                       {quizData.length === 0
                         ? "No quiz data available."
                         : "No students match your search query."}
@@ -268,24 +282,26 @@ export default function Leaderboard() {
                       </TableCell>
                       <TableCell>{student.name}</TableCell>
                       <TableCell>{student.points.toFixed(2)}</TableCell>
-                      <TableCell>
-                        <div className="flex space-x-2">
-                          <Button 
-                            variant="outline" 
-                            size="icon"
-                            onClick={() => handleUpdateQuizPoints(student.student_id, 0.5)}
-                          >
-                            <Plus className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            size="icon"
-                            onClick={() => handleUpdateQuizPoints(student.student_id, -0.5)}
-                          >
-                            <Minus className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
+                      {isUserAdmin && (
+                        <TableCell>
+                          <div className="flex space-x-2">
+                            <Button 
+                              variant="outline" 
+                              size="icon"
+                              onClick={() => handleUpdateQuizPoints(student.student_id, 0.5)}
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="icon"
+                              onClick={() => handleUpdateQuizPoints(student.student_id, -0.5)}
+                            >
+                              <Minus className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))
                 )}
