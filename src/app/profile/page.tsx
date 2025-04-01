@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { getCurrentUser } from "@/lib/auth"
 import { getStudentProfileByUserId, updateStudentProfile, updateProfileImage } from "@/lib/data-service"
@@ -22,13 +22,23 @@ export default function ProfilePage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [profile, setProfile] = useState<any>(null)
+  const [profile, setProfile] = useState<{
+    id: string;
+    first_name: string;
+    last_name: string;
+    phone?: string;
+    profile_image_url?: string;
+    groups?: Array<{
+      id: string;
+      name: string;
+    }>;
+  } | null>(null)
   const [phone, setPhone] = useState("")
   const [profileImage, setProfileImage] = useState<File | null>(null)
   const [photoUrl, setPhotoUrl] = useState<string | null>(null)
 
   // Get student profile data
-  const fetchProfile = async () => {
+  const fetchProfile = useCallback(async () => {
     try {
       setLoading(true)
       const user = getCurrentUser()
@@ -49,9 +59,19 @@ export default function ProfilePage() {
         return
       }
       
-      setProfile(profileData)
-      setPhone(profileData.phone || "")
-      setPhotoUrl(profileData.profile_image_url || null)
+      setProfile(profileData as {
+        id: string;
+        first_name: string;
+        last_name: string;
+        phone?: string;
+        profile_image_url?: string;
+        groups?: Array<{
+          id: string;
+          name: string;
+        }>;
+      })
+      setPhone(profileData.phone as string || "")
+      setPhotoUrl(profileData.profile_image_url as string || null)
     } catch (error) {
       console.error("Error fetching profile:", error)
       toast({
@@ -62,11 +82,11 @@ export default function ProfilePage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [router])
 
   useEffect(() => {
     fetchProfile()
-  }, [])
+  }, [fetchProfile])
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setPhone(e.target.value)
@@ -247,7 +267,7 @@ export default function ProfilePage() {
               
               {profile?.groups && profile.groups.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
-                  {profile.groups.map((group: any) => (
+                  {profile.groups.map((group) => (
                     <Badge key={group.id} variant="secondary">
                       {group.name}
                     </Badge>

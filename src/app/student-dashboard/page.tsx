@@ -2,7 +2,7 @@ import { DashboardLayout } from "@/components/dashboard-layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { Clock, BarChart2, MessageSquare, FileMusic, Award, RefreshCw, PlusCircle } from "lucide-react"
+import { Clock, BarChart2, MessageSquare, FileMusic, RefreshCw, PlusCircle } from "lucide-react"
 import { 
   getStudentPracticeSessions, 
   getStudentPracticeStats, 
@@ -11,7 +11,6 @@ import {
   getStudentRecentActivity
 } from "@/lib/data-service"
 import { RecentActivity } from "@/lib/types"
-import { cookies } from "next/headers"
 import { getStudentId, getCurrentUserId } from "@/lib/server-auth"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
@@ -230,9 +229,6 @@ export default async function StudentDashboard() {
   const minutes = totalMinutes % 60;
   // Format time in the same format as leaderboard
   const formattedTime = `${hours}:${minutes.toString().padStart(2, '0')}m`;
-  
-  // The database function doesn't return points directly, we'll use 0 for now
-  const formattedPoints = "0.00";
   
   // Get total completed sessions
   const totalSessions = practiceStatsData.session_count || 0;

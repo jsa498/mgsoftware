@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from 'react';
-import { useCacheRecovery } from '@/lib/cache-utils';
+import { detectCacheIssue, refreshAppState } from '@/lib/cache-utils';
 
 /**
  * Client component that runs cache recovery on mount
@@ -9,8 +9,20 @@ import { useCacheRecovery } from '@/lib/cache-utils';
  */
 export function CacheRecovery() {
   useEffect(() => {
-    // Run cache recovery check when component mounts
-    useCacheRecovery();
+    // Only run in browser
+    if (typeof window === 'undefined') return;
+    
+    // Check if DOM is mostly empty (possible indicator of rendering issue)
+    const bodyContent = document.body.innerHTML.trim();
+    const isDOMEmpty = bodyContent.length < 100;
+    
+    // Check for cache inconsistencies
+    const hasCacheIssue = detectCacheIssue();
+    
+    // If we detect issues, refresh app state
+    if (isDOMEmpty || hasCacheIssue) {
+      refreshAppState();
+    }
   }, []);
 
   // This component doesn't render anything

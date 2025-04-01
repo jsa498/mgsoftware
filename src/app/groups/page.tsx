@@ -18,7 +18,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogClose,
 } from "@/components/ui/dialog";
 import {
@@ -26,7 +25,6 @@ import {
   AlertDescription,
   AlertTitle,
 } from "@/components/ui/alert";
-import { Separator } from "@/components/ui/separator";
 import { getAllGroups, createGroup, updateGroup, deleteGroup, resetAllData } from "@/lib/data-service";
 import { Group } from "@/lib/types";
 
@@ -256,7 +254,7 @@ export default function GroupsPage() {
           <DialogHeader>
             <DialogTitle>Confirm Deletion</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete the group "{groupToDelete?.name}"? This action cannot be undone.
+              Are you sure you want to delete the group &quot;{groupToDelete?.name}&quot;? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

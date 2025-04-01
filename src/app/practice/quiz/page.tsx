@@ -3,7 +3,7 @@
 import { useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
@@ -11,7 +11,6 @@ import { PlusCircle, Trash2, Plus, UploadCloud } from "lucide-react"
 import { GroupSelect } from "@/components/GroupSelect"
 import { createQuiz, uploadFileToStorage } from "@/lib/data-service"
 import { toast } from "@/components/ui/use-toast"
-import { QuizAttachment } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 export default function CreateQuizPage() {

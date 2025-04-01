@@ -38,7 +38,7 @@ export default function AIPage() {
               <h3 className="text-lg font-medium">Stay tuned for the launch</h3>
             </div>
             <p className="text-muted-foreground">
-              We're putting the finishing touches on our AI assistant. It will be available very soon with exciting features to enhance your educational experience.
+              We&apos;re putting the finishing touches on our AI assistant. It will be available very soon with exciting features to enhance your educational experience.
             </p>
           </div>
 

@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { format, isToday, isYesterday } from "date-fns"
 import { MessageSquare, Info, X } from "lucide-react"
 
@@ -14,9 +13,16 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { ScrollArea } from "@/components/ui/scroll-area"
 
 export default function MessagesPage() {
-  const router = useRouter()
   const [loading, setLoading] = useState(true)
-  const [chatGroups, setChatGroups] = useState<any[]>([])
+  const [chatGroups, setChatGroups] = useState<{
+    id: string;
+    name: string;
+    unreadCount: number;
+    latestMessage?: {
+      body: string;
+      created_at: string;
+    };
+  }[]>([])
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {

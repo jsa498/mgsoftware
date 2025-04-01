@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { DashboardStats, FeeAlert, RecentActivity, Student, Group, Message, PracticeMaterial, Fee, Attendance, StudentAttendance, Quiz, QuizQuestion, QuizResult, QuizAttachment } from './types';
+import { DashboardStats, FeeAlert, RecentActivity, Student, Group, Quiz, QuizQuestion, QuizAttachment } from './types';
 
 /**
  * Fetches dashboard statistics
@@ -1212,7 +1212,7 @@ export async function updatePracticeSession(sessionId: string, durationMinutes: 
 /**
  * Completes a practice session
  */
-export async function completePracticeSession(sessionId: string, durationMinutes: number): Promise<{ success: boolean, sessionData?: any }> {
+export async function completePracticeSession(sessionId: string, durationMinutes: number): Promise<{ success: boolean, sessionData?: Record<string, unknown> }> {
   try {
     // Calculate points (2 points per hour)
     const points = (durationMinutes / 60) * 2;
@@ -1242,7 +1242,7 @@ export async function completePracticeSession(sessionId: string, durationMinutes
 /**
  * Gets the current active practice session for a student, if any
  */
-export async function getActivePracticeSession(studentId: string): Promise<any> {
+export async function getActivePracticeSession(studentId: string): Promise<Record<string, unknown> | null> {
   try {
     const { data, error } = await supabase
       .from('practice_sessions')
@@ -1310,7 +1310,7 @@ export async function createStudentFeeRecord(studentId: string, amount: number =
 }
 
 // Get student profile by user id
-export async function getStudentProfileByUserId(userId: number): Promise<any> {
+export async function getStudentProfileByUserId(userId: number): Promise<Record<string, unknown> | null> {
   try {
     const { data: userData, error: userError } = await supabase
       .from('users')
@@ -1393,7 +1393,7 @@ export async function updateProfileImage(studentId: string, file: File): Promise
     const fileName = `${studentId}-profile-${Date.now()}.${fileExt}`;
     const filePath = `profile-images/${fileName}`;
 
-    const { data, error } = await supabase
+    const { error } = await supabase
       .storage
       .from('student-profiles')
       .upload(filePath, file);

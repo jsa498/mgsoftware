@@ -1,23 +1,17 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { getQuizById } from "@/lib/data-service"
 import { Quiz } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Separator } from "@/components/ui/separator"
 import { Clock, FileText, ChevronLeft, AlertCircle } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 
-interface QuizPageProps {
-  params: {
-    quizId: string
-  }
-}
-
-export default function QuizPage({ params }: QuizPageProps) {
+export default function QuizPage() {
   const router = useRouter()
+  const { quizId } = useParams() as { quizId: string }
   const [quiz, setQuiz] = useState<Quiz | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -29,7 +23,7 @@ export default function QuizPage({ params }: QuizPageProps) {
   useEffect(() => {
     async function loadQuiz() {
       try {
-        const quizData = await getQuizById(params.quizId)
+        const quizData = await getQuizById(quizId)
         if (quizData) {
           setQuiz(quizData)
           
@@ -48,7 +42,7 @@ export default function QuizPage({ params }: QuizPageProps) {
     }
     
     loadQuiz()
-  }, [params.quizId])
+  }, [quizId])
   
   useEffect(() => {
     // Initialize selected answers array when quiz loads
@@ -205,7 +199,7 @@ export default function QuizPage({ params }: QuizPageProps) {
                 <li>Read the questions carefully before answering.</li>
                 <li>You can navigate between questions using the Previous and Next buttons.</li>
                 <li>Once you submit the quiz, you cannot return to change your answers.</li>
-                <li>The timer will start once you click the "Start Quiz" button.</li>
+                <li>The timer will start once you click the &quot;Start Quiz&quot; button.</li>
               </ul>
             </div>
           </CardContent>

@@ -3,8 +3,6 @@ import { createClient } from '@supabase/supabase-js';
 
 // Initialize Supabase client with cookies for server components
 export async function getServerSupabase() {
-  const cookieStore = await cookies();
-  
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string;
   

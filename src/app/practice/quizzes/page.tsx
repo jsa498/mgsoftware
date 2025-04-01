@@ -4,13 +4,11 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { getStudentQuizzes, getQuizById } from "@/lib/data-service"
+import { getStudentQuizzes } from "@/lib/data-service"
 import { getCurrentUser } from "@/lib/auth"
-import { Quiz, QuizResult } from "@/lib/types"
+import { Quiz } from "@/lib/types"
 import { Clock, FileText, CheckCircle, AlertCircle } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
-import { Separator } from "@/components/ui/separator"
 
 export default function StudentQuizzesPage() {
   const router = useRouter()
@@ -89,7 +87,7 @@ export default function StudentQuizzesPage() {
               <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <h2 className="text-xl font-semibold mb-2">No Quizzes Available</h2>
               <p className="text-muted-foreground">
-                You don't have any quizzes assigned to you at the moment.
+                You don&apos;t have any quizzes assigned to you at the moment.
               </p>
             </div>
           </CardContent>

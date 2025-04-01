@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
-import { PlayIcon, PauseIcon, MinusIcon, PlusIcon, ChevronLeftIcon, ChevronRightIcon, VolumeIcon, Timer } from "lucide-react"
+import { useState, useEffect, useRef, useCallback } from "react"
+import { PlayIcon, PauseIcon, MinusIcon, PlusIcon, ChevronLeftIcon, ChevronRightIcon, VolumeIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
 import {
@@ -11,7 +11,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import {
   Tooltip,
@@ -37,7 +42,6 @@ const notes = ["A", "A#", "B", "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#"]
 
 export default function PracticeToolsPage() {
   const [bpm, setBpm] = useState(100)
-  const [matra, setMatra] = useState(1)
   const [currentNote, setCurrentNote] = useState("A")
   const [isPlaying, setIsPlaying] = useState(false)
   const [volumes, setVolumes] = useState({
@@ -51,7 +55,11 @@ export default function PracticeToolsPage() {
   const [practicePoints, setPracticePoints] = useState(0)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [practiceCompleted, setPracticeCompleted] = useState(false)
-  const [completionData, setCompletionData] = useState<any>(null)
+  const [completionData, setCompletionData] = useState<{
+    duration: string;
+    points: string;
+    durationMinutes: number;
+  } | null>(null)
   
   // Timer ref to store interval ID
   const timerRef = useRef<NodeJS.Timeout | null>(null)
@@ -68,8 +76,39 @@ export default function PracticeToolsPage() {
   }
   
   // Calculate points from practice time (2 points per hour)
-  const calculatePoints = (timeInSeconds: number) => {
+  const calculatePoints = useCallback((timeInSeconds: number) => {
     return (timeInSeconds / 3600) * 2
+  }, [])
+
+  // Start the timer for practice session
+  const startTimer = useCallback(() => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current)
+    }
+    
+    timerRef.current = setInterval(() => {
+      setPracticeTime(prev => {
+        const newTime = prev + 1
+        // Update points (2 points per hour)
+        setPracticePoints(calculatePoints(newTime))
+        
+        // Update session in database every minute
+        if (newTime % 60 === 0 && sessionId) {
+          updatePracticeSession(sessionId, Math.floor(newTime / 60))
+            .catch(err => console.error('Error updating session:', err))
+        }
+        
+        return newTime
+      })
+    }, 1000)
+  }, [sessionId, calculatePoints])
+  
+  // Stop the timer
+  const stopTimer = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current)
+      timerRef.current = null
+    }
   }
 
   // Check for existing practice session on mount
@@ -81,11 +120,11 @@ export default function PracticeToolsPage() {
           // Get student profile to get student_id
           const studentProfile = await getStudentProfileByUserId(user.id)
           if (studentProfile?.id) {
-            const session = await getActivePracticeSession(studentProfile.id)
+            const session = await getActivePracticeSession(studentProfile.id as string)
             if (session) {
-              setSessionId(session.id)
+              setSessionId(session.id as string)
               // Calculate elapsed time from started_at to now
-              const startedAt = new Date(session.started_at)
+              const startedAt = new Date(session.started_at as string)
               const now = new Date()
               const elapsedSeconds = Math.floor((now.getTime() - startedAt.getTime()) / 1000)
               setPracticeTime(elapsedSeconds)
@@ -108,38 +147,7 @@ export default function PracticeToolsPage() {
         clearInterval(timerRef.current)
       }
     }
-  }, [])
-  
-  // Start the timer for practice session
-  const startTimer = () => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current)
-    }
-    
-    timerRef.current = setInterval(() => {
-      setPracticeTime(prev => {
-        const newTime = prev + 1
-        // Update points (2 points per hour)
-        setPracticePoints(calculatePoints(newTime))
-        
-        // Update session in database every minute
-        if (newTime % 60 === 0 && sessionId) {
-          updatePracticeSession(sessionId, Math.floor(newTime / 60))
-            .catch(err => console.error('Error updating session:', err))
-        }
-        
-        return newTime
-      })
-    }, 1000)
-  }
-  
-  // Stop the timer
-  const stopTimer = () => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current)
-      timerRef.current = null
-    }
-  }
+  }, [startTimer, calculatePoints])
   
   // Start practice session
   const handleStartPractice = async () => {
@@ -165,7 +173,7 @@ export default function PracticeToolsPage() {
         return
       }
       
-      const id = await startPracticeSession(studentProfile.id)
+      const id = await startPracticeSession(studentProfile.id as string)
       if (id) {
         setSessionId(id)
         setPracticeTime(0)
@@ -244,12 +252,6 @@ export default function PracticeToolsPage() {
   const adjustBpm = (amount: number) => {
     const newBpm = Math.max(30, Math.min(300, bpm + amount))
     setBpm(newBpm)
-  }
-
-  // Function to increment/decrement Matra
-  const adjustMatra = (amount: number) => {
-    const newMatra = Math.max(1, Math.min(16, matra + amount))
-    setMatra(newMatra)
   }
 
   // Function to navigate through notes
@@ -422,10 +424,6 @@ export default function PracticeToolsPage() {
               <div className="text-3xl font-medium tracking-tight">{bpm}</div>
               <div className="text-xs uppercase tracking-widest mt-0.5 text-muted-foreground">BPM</div>
             </div>
-            <div className="text-center py-2 px-5 rounded-full bg-background/5 border border-border/50 shadow-sm">
-              <div className="text-3xl font-medium tracking-tight">{matra}</div>
-              <div className="text-xs uppercase tracking-widest mt-0.5 text-muted-foreground">MATRA</div>
-            </div>
           </div>
 
           {/* Instrument Selection */}
@@ -564,7 +562,7 @@ export default function PracticeToolsPage() {
           <DialogHeader>
             <DialogTitle>Practice Session Completed</DialogTitle>
             <DialogDescription>
-              Great job! Here's a summary of your practice session.
+              Great job! Here&apos;s a summary of your practice session.
             </DialogDescription>
           </DialogHeader>
           

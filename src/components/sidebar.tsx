@@ -29,7 +29,7 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import { Button } from "@/components/ui/button"
 import { clearUserSession, isAdmin } from "@/lib/auth"
 
-interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {}
+type SidebarProps = React.HTMLAttributes<HTMLDivElement>
 
 export function Sidebar({ className, ...props }: SidebarProps) {
   const pathname = usePathname()

@@ -45,7 +45,6 @@ export default function GroupChatPage() {
   const [newMessage, setNewMessage] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [currentStudentId, setCurrentStudentId] = useState<string | null>(null)
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -56,7 +55,6 @@ export default function GroupChatPage() {
     async function fetchCurrentUserInfo() {
       const user = getCurrentUser()
       if (user) {
-        setCurrentUserId(user.id.toString())
         setIsAdmin(user.role === 'admin')
         
         try {

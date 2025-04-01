@@ -1,23 +1,18 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { getQuizById } from "@/lib/data-service"
-import { Quiz, QuizResult } from "@/lib/types"
+import { Quiz } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { CheckCircle, XCircle, ChevronLeft, AlertCircle, FileText } from "lucide-react"
 import { Progress } from "@/components/ui/progress"
 
-interface ResultsPageProps {
-  params: {
-    quizId: string
-  }
-}
-
-export default function QuizResultsPage({ params }: ResultsPageProps) {
+export default function QuizResultsPage() {
   const router = useRouter()
+  const { quizId } = useParams() as { quizId: string }
   const [quiz, setQuiz] = useState<Quiz | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -35,7 +30,7 @@ export default function QuizResultsPage({ params }: ResultsPageProps) {
   useEffect(() => {
     async function loadQuiz() {
       try {
-        const quizData = await getQuizById(params.quizId)
+        const quizData = await getQuizById(quizId)
         if (quizData) {
           setQuiz(quizData)
         } else {
@@ -50,7 +45,7 @@ export default function QuizResultsPage({ params }: ResultsPageProps) {
     }
     
     loadQuiz()
-  }, [params.quizId])
+  }, [quizId])
   
   if (loading) {
     return (

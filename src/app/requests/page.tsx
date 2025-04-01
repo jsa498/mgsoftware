@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { LockKeyhole, RefreshCcw, BookOpen, FileEdit, Bug, Lightbulb } from "lucide-react"
+import { LockKeyhole, RefreshCcw, BookOpen, FileEdit, Bug } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -26,7 +26,7 @@ const mockRequests: Request[] = [
 
 export default function RequestsPage() {
   const [isLoading, setIsLoading] = useState(false)
-  const [requests, setRequests] = useState<Request[]>(mockRequests)
+  const [requests] = useState<Request[]>(mockRequests)
 
   // Filter requests by type
   const pinChangeRequests = requests.filter(req => req.requestType === 'pin')

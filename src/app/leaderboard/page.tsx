@@ -8,6 +8,8 @@ import {
   Plus,
   Minus,
   MoreVertical,
+  BarChart2,
+  RotateCcw,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -152,16 +154,19 @@ export default function Leaderboard() {
           />
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={fetchLeaderboardData}>
-            <RefreshCw className="h-4 w-4 mr-2" /> Refresh
+          <Button variant="outline" onClick={fetchLeaderboardData} aria-label="Refresh">
+            <RefreshCw className="h-4 w-4 md:mr-2" />
+            <span className="hidden md:inline">Refresh</span>
           </Button>
           {isUserAdmin && (
             <>
-              <Button onClick={handleCalibratePoints}>
-                Calibrate Points
+              <Button onClick={handleCalibratePoints} aria-label="Calibrate Points">
+                <span className="hidden md:inline">Calibrate Points</span>
+                <BarChart2 className="h-4 w-4 md:hidden" />
               </Button>
-              <Button variant="destructive" onClick={handleResetAll}>
-                Reset All Points & Time
+              <Button variant="destructive" onClick={handleResetAll} aria-label="Reset All Points & Time">
+                <span className="hidden md:inline">Reset All Points & Time</span>
+                <RotateCcw className="h-4 w-4 md:hidden" />
               </Button>
             </>
           )}

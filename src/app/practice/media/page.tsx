@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { usePathname } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { getStudentPracticeMaterials } from "@/lib/data-service"
@@ -22,7 +21,6 @@ interface PracticeMaterialWithGroups extends PracticeMaterial {
 export default function PracticeMediaPage() {
   const [materials, setMaterials] = useState<PracticeMaterialWithGroups[]>([])
   const [loading, setLoading] = useState(true)
-  const pathname = usePathname()
 
   useEffect(() => {
     const fetchMaterials = async () => {
@@ -108,7 +106,7 @@ export default function PracticeMediaPage() {
           ) : materials.length === 0 ? (
             <div className="text-center py-10">
               <p className="text-gray-500 dark:text-gray-400">No practice materials available.</p>
-              <p className="text-sm mt-2">Your teacher hasn't shared any practice files with you yet.</p>
+              <p className="text-sm mt-2">Your teacher hasn&apos;t shared any practice files with you yet.</p>
             </div>
           ) : (
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">

@@ -1,8 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameMonth, 
-  isToday, addMonths, subMonths, startOfWeek, endOfWeek, addWeeks, subWeeks, getWeek, getWeeksInMonth } from "date-fns"
+import { format, startOfMonth, eachDayOfInterval, isSameMonth, 
+  isToday, startOfWeek, endOfWeek, addWeeks, subWeeks, getWeek, getWeeksInMonth } from "date-fns"
 import { Users } from "lucide-react"
 import { ChevronLeft, ChevronRight, Check, X, Info } from "lucide-react"
 
@@ -15,11 +15,11 @@ import { Progress } from "@/components/ui/progress"
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
 import { cn } from "@/lib/utils"
 import { getAllGroups, getGroupStudents, getGroupAttendance, updateAttendance, clearGroupAttendance } from "@/lib/data-service"
-import { Group, Student, StudentAttendance } from "@/lib/types"
+import { Group, StudentAttendance } from "@/lib/types"
 import { toast } from "@/components/ui/use-toast"
 
 export default function AttendancePage() {
-  const [currentDate, setCurrentDate] = useState(new Date())
+  const [currentDate] = useState(new Date())
   const [groups, setGroups] = useState<Group[]>([])
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null)
   const [students, setStudents] = useState<StudentAttendance[]>([])
@@ -169,6 +169,8 @@ export default function AttendancePage() {
     setCurrentWeekStart(prev => addWeeks(prev, 1))
   }
 
+  // These functions are currently unused but may be needed in the future
+  /* 
   const handlePreviousMonth = () => {
     setSelectedMonth(prev => {
       const newMonth = subMonths(prev, 1)
@@ -186,6 +188,7 @@ export default function AttendancePage() {
       return newMonth
     })
   }
+  */
 
   const handleClearAllAttendance = async () => {
     if (!selectedGroup) return;

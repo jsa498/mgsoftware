@@ -104,7 +104,7 @@ export function clearUserSession() {
       // Last resort - attempt to clear everything
       try {
         sessionStorage.clear();
-      } catch (e) {
+      } catch {
         // Silent fail
       }
     }

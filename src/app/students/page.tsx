@@ -1,8 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, ChangeEvent } from "react";
-import Link from "next/link";
-import { PlusCircle, Search, Pencil, Trash2, Eye, EyeOff, AlertTriangle, MinusCircle } from "lucide-react";
+import { PlusCircle, Search, Trash2, Eye, EyeOff, AlertTriangle, MinusCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -313,11 +312,11 @@ export default function StudentsPage() {
         ...prev,
         [studentData.id]: feeInfo
       }));
-    } catch (error: any) {
+    } catch (error: Error | unknown) {
       console.error("Error registering student:", error);
       toast({
         title: "Registration failed",
-        description: error.message || "There was an error registering the student.",
+        description: error instanceof Error ? error.message : "There was an error registering the student.",
         variant: "destructive",
       });
     } finally {
@@ -353,11 +352,11 @@ export default function StudentsPage() {
       } else {
         throw new Error("Failed to delete student");
       }
-    } catch (error: any) {
+    } catch (error: Error | unknown) {
       console.error("Error deleting student:", error);
       toast({
         title: "Deletion failed",
-        description: error.message || "There was an error deleting the student.",
+        description: error instanceof Error ? error.message : "There was an error deleting the student.",
         variant: "destructive",
       });
     } finally {
