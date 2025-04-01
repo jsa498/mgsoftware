@@ -1147,4 +1147,127 @@ export async function createStudentFeeRecord(studentId: string, amount: number =
     console.error('Error creating student fee record:', error);
     return false;
   }
+}
+
+// Get student profile by user id
+export async function getStudentProfileByUserId(userId: number): Promise<any> {
+  try {
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('student_id')
+      .eq('id', userId)
+      .single();
+
+    if (userError || !userData?.student_id) {
+      console.error('Error getting student ID from user:', userError);
+      return null;
+    }
+
+    const { data: studentData, error: studentError } = await supabase
+      .from('students')
+      .select('id, first_name, last_name, phone, profile_image_url')
+      .eq('id', userData.student_id)
+      .single();
+
+    if (studentError || !studentData) {
+      console.error('Error getting student data:', studentError);
+      return null;
+    }
+
+    // Get student's groups
+    const { data: groupsData, error: groupsError } = await supabase
+      .from('student_groups')
+      .select(`
+        id,
+        groups:group_id (
+          id,
+          name,
+          description
+        )
+      `)
+      .eq('student_id', studentData.id);
+
+    if (groupsError) {
+      console.error('Error getting student groups:', groupsError);
+      return { ...studentData, groups: [] };
+    }
+
+    // Format the groups data
+    const groups = groupsData.map(item => item.groups);
+
+    return {
+      ...studentData,
+      groups
+    };
+  } catch (error) {
+    console.error('Error fetching student profile:', error);
+    return null;
+  }
+}
+
+// Update student profile
+export async function updateStudentProfile(studentId: string, data: { phone?: string }): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('students')
+      .update(data)
+      .eq('id', studentId);
+
+    if (error) {
+      console.error('Error updating student profile:', error);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error updating student profile:', error);
+    return false;
+  }
+}
+
+// Update student profile image
+export async function updateProfileImage(studentId: string, file: File): Promise<string | null> {
+  try {
+    // Upload the file to Supabase storage
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${studentId}-profile-${Date.now()}.${fileExt}`;
+    const filePath = `profile-images/${fileName}`;
+
+    const { data, error } = await supabase
+      .storage
+      .from('student-profiles')
+      .upload(filePath, file);
+
+    if (error) {
+      console.error('Error uploading profile image:', error);
+      return null;
+    }
+
+    // Get the public URL
+    const { data: publicUrlData } = supabase
+      .storage
+      .from('student-profiles')
+      .getPublicUrl(filePath);
+
+    if (!publicUrlData.publicUrl) {
+      console.error('Failed to get public URL for uploaded image');
+      return null;
+    }
+
+    // Update the student record with the new image URL
+    const { error: updateError } = await supabase
+      .from('students')
+      .update({ profile_image_url: publicUrlData.publicUrl })
+      .eq('id', studentId);
+
+    if (updateError) {
+      console.error('Error updating student profile with image URL:', updateError);
+      return null;
+    }
+
+    return publicUrlData.publicUrl;
+  } catch (error) {
+    console.error('Error updating profile image:', error);
+    return null;
+  }
 } 

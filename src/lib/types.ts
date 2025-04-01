@@ -101,6 +101,7 @@ export type FeeAlert = {
   amount: number;
   paid_until: string;
   status: string;
+  alert_type: 'past_due' | 'due_soon' | 'upcoming';
 };
 
 export type Attendance = {

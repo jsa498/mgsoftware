@@ -115,7 +115,22 @@ export default async function Home() {
                             Fees paid until {new Date(alert.paid_until).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                           </p>
                         </div>
-                        <Badge variant="destructive">Past Due</Badge>
+                        <Badge 
+                          variant={
+                            alert.alert_type === 'past_due' 
+                              ? 'destructive' 
+                              : alert.alert_type === 'due_soon'
+                                ? 'warning'
+                                : 'default'
+                          }
+                        >
+                          {alert.alert_type === 'past_due' 
+                            ? 'Past Due'
+                            : alert.alert_type === 'due_soon'
+                              ? 'Due Soon'
+                              : 'Upcoming'
+                          }
+                        </Badge>
                       </div>
                       <Separator className="my-2" />
                     </div>
