@@ -160,4 +160,15 @@ export type QuizResult = {
   score: number;
   completed_at: string;
   created_at: string;
+};
+
+export type FeatureRequest = {
+  id: string;
+  student_id: string;
+  type: 'feature' | 'bug';
+  title: string;
+  description: string;
+  status: 'pending' | 'rejected' | 'in_development' | 'completed';
+  created_at: string;
+  updated_at: string;
 }; 

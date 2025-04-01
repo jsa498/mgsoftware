@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { 
@@ -18,7 +18,10 @@ import {
   ChevronDown,
   ChevronRight,
   UserIcon,
-  Library
+  Library,
+  Bot,
+  Menu,
+  X
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -33,6 +36,31 @@ export function Sidebar({ className, ...props }: SidebarProps) {
   const router = useRouter()
   const [practiceOpen, setPracticeOpen] = useState(false)
   const isUserAdmin = isAdmin()
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
+  
+  // Check for mobile view
+  useEffect(() => {
+    const checkIfMobile = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+    
+    // Set initial value
+    checkIfMobile()
+    
+    // Add event listener
+    window.addEventListener('resize', checkIfMobile)
+    
+    // Cleanup
+    return () => {
+      window.removeEventListener('resize', checkIfMobile)
+    }
+  }, [])
+
+  // Close mobile menu when route changes
+  useEffect(() => {
+    setIsMobileMenuOpen(false)
+  }, [pathname])
   
   // Define practice sub-items based on user role
   const practiceSubItems = isUserAdmin 
@@ -107,6 +135,11 @@ export function Sidebar({ className, ...props }: SidebarProps) {
       name: "Requests",
       href: "/requests",
       icon: ClipboardList,
+    },
+    {
+      name: "AI Assistant",
+      href: "/ai",
+      icon: Bot,
     }
   ]
 
@@ -136,6 +169,11 @@ export function Sidebar({ className, ...props }: SidebarProps) {
       name: "Requests",
       href: "/requests",
       icon: ClipboardList,
+    },
+    {
+      name: "AI Assistant",
+      href: "/ai",
+      icon: Bot,
     }
   ]
 
@@ -155,6 +193,245 @@ export function Sidebar({ className, ...props }: SidebarProps) {
 
   const isPracticeActive = pathname.startsWith('/practice')
 
+  // For mobile menu
+  const toggleMobileMenu = () => {
+    setIsMobileMenuOpen(!isMobileMenuOpen)
+  }
+
+  if (isMobile) {
+    return (
+      <>
+        {/* Mobile Floating Navigation Bar */}
+        <div className="fixed top-2 left-1/2 transform -translate-x-1/2 z-[100] flex items-center justify-between bg-background border rounded-full shadow-lg px-4 py-1.5 w-9/12 max-w-[16rem]">
+          <span className="font-semibold">MGS VIDYALA</span>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <Button 
+              variant="outline" 
+              size="icon" 
+              className="rounded-full dark:bg-white dark:text-black bg-black text-white"
+              onClick={toggleMobileMenu}
+            >
+              <Menu className="h-[1.2rem] w-[1.2rem]" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Add padding to push content below the pill bar */}
+        <div className="pt-14"></div>
+
+        {/* Mobile Menu Overlay */}
+        <div 
+          className={cn(
+            "fixed inset-0 bg-background z-[200] transition-transform duration-300 transform",
+            isMobileMenuOpen ? "translate-x-0" : "translate-x-full"
+          )}
+        >
+          <div className="flex flex-col h-screen">
+            <div className="px-4 py-3 flex items-center justify-end h-16 border-b">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className=""
+                onClick={toggleMobileMenu}
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+            
+            <div className="flex-1 overflow-auto py-4">
+              <nav className="grid items-start px-4 text-sm font-medium gap-2">
+                {/* Admin or Student Routes */}
+                {isUserAdmin ? (
+                  // Admin view
+                  <>
+                    {routes.slice(0, 4).map((route) => (
+                      <Link
+                        key={route.href}
+                        href={route.href}
+                        className={cn(
+                          "flex items-center gap-3 rounded-lg px-3 py-3 transition-all hover:text-primary",
+                          pathname === route.href 
+                            ? "bg-muted text-primary" 
+                            : "text-muted-foreground hover:bg-muted"
+                        )}
+                      >
+                        <route.icon className="h-5 w-5" />
+                        <span className="text-base">{route.name}</span>
+                      </Link>
+                    ))}
+                    
+                    {/* Practice Dropdown */}
+                    <div className="relative">
+                      <button
+                        onClick={togglePracticeMenu}
+                        className={cn(
+                          "w-full flex items-center justify-between gap-3 rounded-lg px-3 py-3 transition-all hover:text-primary",
+                          isPracticeActive
+                            ? "bg-muted text-primary" 
+                            : "text-muted-foreground hover:bg-muted"
+                        )}
+                      >
+                        <div className="flex items-center gap-3">
+                          <BookOpen className="h-5 w-5" />
+                          <span className="text-base">Practice</span>
+                        </div>
+                        {practiceOpen ? (
+                          <ChevronDown className="h-5 w-5" />
+                        ) : (
+                          <ChevronRight className="h-5 w-5" />
+                        )}
+                      </button>
+                      
+                      <div 
+                        className={cn(
+                          "pl-4 py-1 overflow-hidden transition-all duration-300 ease-in-out",
+                          practiceOpen 
+                            ? "max-h-[500px] opacity-100" 
+                            : "max-h-0 opacity-0"
+                        )}
+                      >
+                        {practiceSubItems.map((item) => (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            className={cn(
+                              "flex items-center gap-3 rounded-lg px-3 py-3 transition-all hover:text-primary",
+                              pathname === item.href 
+                                ? "bg-muted text-primary" 
+                                : "text-muted-foreground hover:bg-muted"
+                            )}
+                          >
+                            <item.icon className="h-5 w-5" />
+                            <span className="text-base">{item.name}</span>
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    {routes.slice(4).map((route) => (
+                      <Link
+                        key={route.href}
+                        href={route.href}
+                        className={cn(
+                          "flex items-center gap-3 rounded-lg px-3 py-3 transition-all hover:text-primary",
+                          pathname === route.href 
+                            ? "bg-muted text-primary" 
+                            : "text-muted-foreground hover:bg-muted"
+                        )}
+                      >
+                        <route.icon className="h-5 w-5" />
+                        <span className="text-base">{route.name}</span>
+                      </Link>
+                    ))}
+                  </>
+                ) : (
+                  // Student view
+                  <>
+                    {routes.slice(0, 2).map((route) => (
+                      <Link
+                        key={route.href}
+                        href={route.href}
+                        className={cn(
+                          "flex items-center gap-3 rounded-lg px-3 py-3 transition-all hover:text-primary",
+                          pathname === route.href 
+                            ? "bg-muted text-primary" 
+                            : "text-muted-foreground hover:bg-muted"
+                        )}
+                      >
+                        <route.icon className="h-5 w-5" />
+                        <span className="text-base">{route.name}</span>
+                      </Link>
+                    ))}
+                    
+                    {/* Practice Dropdown */}
+                    <div className="relative">
+                      <button
+                        onClick={togglePracticeMenu}
+                        className={cn(
+                          "w-full flex items-center justify-between gap-3 rounded-lg px-3 py-3 transition-all hover:text-primary",
+                          isPracticeActive
+                            ? "bg-muted text-primary" 
+                            : "text-muted-foreground hover:bg-muted"
+                        )}
+                      >
+                        <div className="flex items-center gap-3">
+                          <BookOpen className="h-5 w-5" />
+                          <span className="text-base">Practice</span>
+                        </div>
+                        {practiceOpen ? (
+                          <ChevronDown className="h-5 w-5" />
+                        ) : (
+                          <ChevronRight className="h-5 w-5" />
+                        )}
+                      </button>
+                      
+                      <div 
+                        className={cn(
+                          "pl-4 py-1 overflow-hidden transition-all duration-300 ease-in-out",
+                          practiceOpen 
+                            ? "max-h-[500px] opacity-100" 
+                            : "max-h-0 opacity-0"
+                        )}
+                      >
+                        {practiceSubItems.map((item) => (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            className={cn(
+                              "flex items-center gap-3 rounded-lg px-3 py-3 transition-all hover:text-primary",
+                              pathname === item.href 
+                                ? "bg-muted text-primary" 
+                                : "text-muted-foreground hover:bg-muted"
+                            )}
+                          >
+                            <item.icon className="h-5 w-5" />
+                            <span className="text-base">{item.name}</span>
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    {routes.slice(2).map((route) => (
+                      <Link
+                        key={route.href}
+                        href={route.href}
+                        className={cn(
+                          "flex items-center gap-3 rounded-lg px-3 py-3 transition-all hover:text-primary",
+                          pathname === route.href 
+                            ? "bg-muted text-primary" 
+                            : "text-muted-foreground hover:bg-muted"
+                        )}
+                      >
+                        <route.icon className="h-5 w-5" />
+                        <span className="text-base">{route.name}</span>
+                      </Link>
+                    ))}
+                  </>
+                )}
+              </nav>
+            </div>
+            
+            <div className="px-4 py-4 border-t mt-auto">
+              <Button
+                variant="ghost" 
+                className="w-full justify-start text-muted-foreground hover:text-primary py-3"
+                onClick={handleSignOut}
+              >
+                <LogOut className="h-5 w-5 mr-3" />
+                <span className="text-base">Sign Out</span>
+              </Button>
+              <div className="flex items-center gap-3 rounded-lg px-3 py-2">
+                <div className="text-sm font-medium">v1.0.0</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </>
+    )
+  }
+
+  // Desktop view - original sidebar  
   return (
     <div className={cn("flex flex-col h-screen bg-background border-r", className)} {...props}>
       <div className="px-3 py-2 flex items-center h-16 border-b">

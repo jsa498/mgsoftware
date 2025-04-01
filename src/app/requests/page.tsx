@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { LockKeyhole, RefreshCcw, BookOpen, FileEdit } from "lucide-react"
+import { LockKeyhole, RefreshCcw, BookOpen, FileEdit, Bug, Lightbulb } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -32,7 +32,7 @@ export default function RequestsPage() {
   const pinChangeRequests = requests.filter(req => req.requestType === 'pin')
   const quizRetryRequests = requests.filter(req => req.requestType === 'quiz')
   const practiceRetryRequests = requests.filter(req => req.requestType === 'practice')
-  const generalQuizRetryRequests = requests.filter(req => req.requestType === 'general')
+  const featureAndBugRequests = requests.filter(req => req.requestType === 'general')
 
   // Refresh requests from server (simulated)
   const refreshRequests = () => {
@@ -134,14 +134,14 @@ export default function RequestsPage() {
           </CardContent>
         </Card>
 
-        {/* General Quiz Retry Requests */}
+        {/* Feature Requests & Bug Reports */}
         <Card>
           <CardHeader className="flex flex-row items-center gap-2 pb-2">
-            <RefreshCcw className="h-5 w-5 text-amber-500" />
-            <CardTitle className="text-lg">Quiz Retry Requests (General)</CardTitle>
+            <Bug className="h-5 w-5 text-amber-500" />
+            <CardTitle className="text-lg">Feature Requests & Bug Reports</CardTitle>
           </CardHeader>
           <CardContent>
-            {renderRequestsOrEmpty(generalQuizRetryRequests, "No pending general quiz retry requests")}
+            {renderRequestsOrEmpty(featureAndBugRequests, "No pending feature requests or bug reports")}
           </CardContent>
         </Card>
       </div>

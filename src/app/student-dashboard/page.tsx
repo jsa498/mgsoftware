@@ -2,18 +2,23 @@ import { DashboardLayout } from "@/components/dashboard-layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { Clock, BarChart2, MessageSquare, FileMusic, Award, RefreshCw } from "lucide-react"
+import { Clock, BarChart2, MessageSquare, FileMusic, Award, RefreshCw, PlusCircle } from "lucide-react"
 import { 
   getStudentPracticeSessions, 
   getStudentPracticeStats, 
   getStudentUnreadMessages, 
-  getStudentFeeStatus,
+  getStudentFeatureRequests,
   getStudentRecentActivity
 } from "@/lib/data-service"
 import { RecentActivity } from "@/lib/types"
 import { cookies } from "next/headers"
 import { getStudentId, getCurrentUserId } from "@/lib/server-auth"
 import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { redirect } from "next/navigation"
 
 // This forces Next.js to treat this as a dynamic route that won't be cached
 export const dynamic = 'force-dynamic';
@@ -97,7 +102,7 @@ export default async function StudentDashboard() {
             </Card>
           </div>
           
-          {/* Recent Activity and Fee Status */}
+          {/* Recent Activity and Feature Requests */}
           <div className="grid gap-4 md:grid-cols-2">
             <Card className="col-span-1">
               <CardHeader>
@@ -108,13 +113,92 @@ export default async function StudentDashboard() {
               </CardContent>
             </Card>
             
-            {/* Fee Status */}
+            {/* Feature Requests */}
             <Card className="col-span-1">
-              <CardHeader>
-                <CardTitle>Fee Status</CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>Feature Requests & Bug Reports</CardTitle>
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="gap-1">
+                      <PlusCircle className="h-4 w-4" />
+                      New Request
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Submit a Request</DialogTitle>
+                      <DialogDescription>
+                        Request a feature or report a bug in the system.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <form action={async (formData: FormData) => {
+                      'use server'
+                      const title = formData.get('title') as string
+                      const description = formData.get('description') as string
+                      const type = formData.get('type') as string
+                      
+                      if (!title || !description || !type) {
+                        return
+                      }
+                      
+                      const { createFeatureRequest } = await import('@/lib/data-service')
+                      await createFeatureRequest(
+                        studentId,
+                        type as 'feature' | 'bug',
+                        title,
+                        description
+                      )
+                      
+                      // Refresh the page
+                      redirect('/student-dashboard')
+                    }}>
+                      <div className="grid gap-4 py-4">
+                        <div className="flex items-center gap-4">
+                          <Label htmlFor="request-type-feature" className="flex items-center gap-2">
+                            <input 
+                              type="radio" 
+                              id="request-type-feature" 
+                              name="type" 
+                              value="feature"
+                              className="h-4 w-4"
+                              defaultChecked
+                            />
+                            Feature Request
+                          </Label>
+                          <Label htmlFor="request-type-bug" className="flex items-center gap-2">
+                            <input 
+                              type="radio" 
+                              id="request-type-bug" 
+                              name="type" 
+                              value="bug"
+                              className="h-4 w-4"
+                            />
+                            Bug Report
+                          </Label>
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="title">Title</Label>
+                          <Input id="title" name="title" placeholder="Brief title for your request" />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="description">Description</Label>
+                          <Textarea 
+                            id="description" 
+                            name="description"
+                            placeholder="Please describe your feature request or bug report in detail"
+                            rows={5} 
+                          />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button type="submit">Submit Request</Button>
+                      </DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
               </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">No fee information available.</p>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">No requests submitted yet.</p>
               </CardContent>
             </Card>
           </div>
@@ -131,7 +215,7 @@ export default async function StudentDashboard() {
   console.log("Practice Stats:", practiceStats);
   
   const unreadMessages = await getStudentUnreadMessages(studentId);
-  const feeStatus = await getStudentFeeStatus(studentId);
+  const featureRequests = await getStudentFeatureRequests(studentId);
   const recentActivity = await getStudentRecentActivity(studentId);
   
   // The database function returns an array, so we need to get the first element
@@ -211,7 +295,7 @@ export default async function StudentDashboard() {
           </Card>
         </div>
         
-        {/* Recent Activity and Fee Status */}
+        {/* Recent Activity and Feature Requests */}
         <div className="grid gap-4 md:grid-cols-2">
           <Card className="col-span-1">
             <CardHeader>
@@ -260,39 +344,122 @@ export default async function StudentDashboard() {
             </CardContent>
           </Card>
           
-          {/* Fee Status */}
+          {/* Feature Requests */}
           <Card className="col-span-1">
-            <CardHeader>
-              <CardTitle>Fee Status</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Feature Requests & Bug Reports</CardTitle>
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-1">
+                    <PlusCircle className="h-4 w-4" />
+                    New Request
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Submit a Request</DialogTitle>
+                    <DialogDescription>
+                      Request a feature or report a bug in the system.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <form action={async (formData: FormData) => {
+                    'use server'
+                    const title = formData.get('title') as string
+                    const description = formData.get('description') as string
+                    const type = formData.get('type') as string
+                    
+                    if (!title || !description || !type) {
+                      return
+                    }
+                    
+                    const { createFeatureRequest } = await import('@/lib/data-service')
+                    await createFeatureRequest(
+                      studentId,
+                      type as 'feature' | 'bug',
+                      title,
+                      description
+                    )
+                    
+                    // Refresh the page
+                    redirect('/student-dashboard')
+                  }}>
+                    <div className="grid gap-4 py-4">
+                      <div className="flex items-center gap-4">
+                        <Label htmlFor="request-type-feature" className="flex items-center gap-2">
+                          <input 
+                            type="radio" 
+                            id="request-type-feature" 
+                            name="type" 
+                            value="feature"
+                            className="h-4 w-4"
+                            defaultChecked
+                          />
+                          Feature Request
+                        </Label>
+                        <Label htmlFor="request-type-bug" className="flex items-center gap-2">
+                          <input 
+                            type="radio" 
+                            id="request-type-bug" 
+                            name="type" 
+                            value="bug"
+                            className="h-4 w-4"
+                          />
+                          Bug Report
+                        </Label>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="title">Title</Label>
+                        <Input id="title" name="title" placeholder="Brief title for your request" />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="description">Description</Label>
+                        <Textarea 
+                          id="description" 
+                          name="description"
+                          placeholder="Please describe your feature request or bug report in detail"
+                          rows={5} 
+                        />
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button type="submit">Submit Request</Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
             </CardHeader>
             <CardContent className="space-y-4">
-              {feeStatus ? (
+              {featureRequests && featureRequests.length > 0 ? (
                 <div className="space-y-3">
-                  <div>
-                    <div className="flex justify-between items-center">
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium">Your Fee Status</p>
-                        <p className="text-xs text-muted-foreground">
-                          Fees paid until {new Date(feeStatus.paid_until).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-                        </p>
+                  {featureRequests.map((request) => (
+                    <div key={request.id}>
+                      <div className="flex justify-between items-center">
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium">{request.title}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {request.type === 'feature' ? 'Feature request' : 'Bug report'} • Submitted on {new Date(request.created_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <Badge 
+                          variant={
+                            request.status === 'rejected' ? 'destructive' : 
+                            request.status === 'pending' ? 'outline' : 
+                            request.status === 'in_development' ? 'default' :
+                            'secondary'
+                          }
+                        >
+                          {request.status === 'pending' ? 'Pending' : 
+                           request.status === 'rejected' ? 'Rejected' : 
+                           request.status === 'in_development' ? 'In Development' :
+                           'Completed'}
+                        </Badge>
                       </div>
-                      <Badge 
-                        variant={
-                          feeStatus.status === 'past_due' ? 'destructive' : 
-                          feeStatus.status === 'due' ? 'default' : 
-                          'secondary'
-                        }
-                      >
-                        {feeStatus.status === 'past_due' ? 'Past Due' : 
-                         feeStatus.status === 'due' ? 'Due This Month' : 
-                         'Paid'}
-                      </Badge>
+                      <Separator className="my-2" />
                     </div>
-                    <Separator className="my-2" />
-                  </div>
+                  ))}
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground">No fee information available.</p>
+                <p className="text-sm text-muted-foreground">No requests submitted yet.</p>
               )}
             </CardContent>
           </Card>

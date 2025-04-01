@@ -1708,4 +1708,108 @@ export async function getStudentQuizzes(studentId: string): Promise<Quiz[]> {
     console.error('Error fetching student quizzes:', error);
     return [];
   }
+}
+
+/**
+ * Creates a new feature request or bug report
+ */
+export async function createFeatureRequest(
+  studentId: string,
+  type: 'feature' | 'bug',
+  title: string,
+  description: string
+): Promise<{ success: boolean; id?: string }> {
+  try {
+    const { data, error } = await supabase
+      .from('feature_requests')
+      .insert([
+        {
+          student_id: studentId,
+          type,
+          title,
+          description,
+          status: 'pending'
+        }
+      ])
+      .select('id')
+      .single();
+    
+    if (error) throw error;
+    
+    return { success: true, id: data.id };
+  } catch (error) {
+    console.error('Error creating feature request:', error);
+    return { success: false };
+  }
+}
+
+/**
+ * Gets all feature requests for admin
+ */
+export async function getAllFeatureRequests() {
+  try {
+    const { data, error } = await supabase
+      .from('feature_requests')
+      .select(`
+        *,
+        students:student_id (
+          id,
+          first_name,
+          last_name
+        )
+      `)
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching all feature requests:', error);
+    return [];
+  }
+}
+
+/**
+ * Gets feature requests for a specific student
+ */
+export async function getStudentFeatureRequests(studentId: string) {
+  try {
+    const { data, error } = await supabase
+      .from('feature_requests')
+      .select('*')
+      .eq('student_id', studentId)
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching student feature requests:', error);
+    return [];
+  }
+}
+
+/**
+ * Updates the status of a feature request
+ */
+export async function updateFeatureRequestStatus(
+  id: string,
+  status: 'pending' | 'rejected' | 'in_development' | 'completed'
+): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('feature_requests')
+      .update({ 
+        status,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id);
+    
+    if (error) throw error;
+    
+    return true;
+  } catch (error) {
+    console.error('Error updating feature request status:', error);
+    return false;
+  }
 } 
