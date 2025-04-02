@@ -5,6 +5,9 @@ import { Separator } from "@/components/ui/separator"
 import { Users, UserPlus2, MessageSquare, FileMusic } from "lucide-react"
 import { getDashboardStats, getRecentActivity, getFeeAlerts } from "@/lib/data-service"
 
+// This forces Next.js to treat this as a dynamic route that won't be cached
+export const dynamic = 'force-dynamic';
+
 export default async function Home() {
   // Fetch data for dashboard
   const stats = await getDashboardStats()
