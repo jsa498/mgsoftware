@@ -13,7 +13,7 @@ export async function authenticateUser(username: string, pin: string): Promise<U
     const { data, error } = await supabase
       .from('users')
       .select('id, username, role')
-      .eq('username', username)
+      .eq('username', username.toLowerCase())
       .eq('pin', pin)
       .single();
 

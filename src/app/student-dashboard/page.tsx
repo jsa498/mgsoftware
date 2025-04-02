@@ -299,7 +299,7 @@ export default async function StudentDashboard() {
             </CardHeader>
             <CardContent className="space-y-4">
               {recentActivity && recentActivity.length > 0 ? (
-                <div className="space-y-2">
+                <div className="space-y-2 max-h-[420px] overflow-y-auto pr-2">
                   {recentActivity.map((activity: RecentActivity) => (
                     <div key={activity.id}>
                       <div className="flex items-center gap-2">
@@ -426,7 +426,7 @@ export default async function StudentDashboard() {
             </CardHeader>
             <CardContent className="space-y-4">
               {featureRequests && featureRequests.length > 0 ? (
-                <div className="space-y-3">
+                <div className="space-y-2 max-h-[420px] overflow-y-auto pr-2">
                   {featureRequests.map((request) => (
                     <div key={request.id}>
                       <div className="flex justify-between items-center">

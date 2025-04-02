@@ -65,7 +65,7 @@ export default function RequestsPage() {
     }
     
     return (
-      <div className="space-y-3">
+      <div className="space-y-3 max-h-[420px] overflow-y-auto pr-2">
         {requests.map(request => (
           <div key={request.id} className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
             <div>

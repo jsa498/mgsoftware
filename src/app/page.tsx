@@ -67,7 +67,7 @@ export default async function Home() {
             </CardHeader>
             <CardContent className="space-y-4">
               {recentActivity.length > 0 ? (
-                <div className="space-y-2">
+                <div className="space-y-2 max-h-[420px] overflow-y-auto pr-2">
                   {recentActivity.map((activity) => (
                     <div key={activity.id}>
                       <div className="flex items-center gap-2">
@@ -105,7 +105,7 @@ export default async function Home() {
             </CardHeader>
             <CardContent className="space-y-4">
               {feeAlerts.length > 0 ? (
-                <div className="space-y-3">
+                <div className="space-y-3 max-h-[420px] overflow-y-auto pr-2">
                   {feeAlerts.map((alert) => (
                     <div key={alert.id}>
                       <div className="flex justify-between items-center">
