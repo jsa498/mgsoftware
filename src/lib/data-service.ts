@@ -1367,7 +1367,11 @@ export async function getStudentProfileByUserId(userId: number): Promise<Record<
 }
 
 // Update student profile
-export async function updateStudentProfile(studentId: string, data: { phone?: string }): Promise<boolean> {
+export async function updateStudentProfile(studentId: string, data: { 
+  phone?: string;
+  first_name?: string;
+  last_name?: string;
+}): Promise<boolean> {
   try {
     const { error } = await supabase
       .from('students')
@@ -1382,6 +1386,41 @@ export async function updateStudentProfile(studentId: string, data: { phone?: st
     return true;
   } catch (error) {
     console.error('Error updating student profile:', error);
+    return false;
+  }
+}
+
+// Update user username
+export async function updateUsername(studentId: string, username: string): Promise<boolean> {
+  try {
+    // First check if the username is already taken
+    const { data: existingUser } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', username.toLowerCase())
+      .neq('student_id', studentId)
+      .single();
+    
+    if (existingUser) {
+      // Username already exists for another user
+      console.error('Username already taken');
+      return false;
+    }
+    
+    // Update the username
+    const { error } = await supabase
+      .from('users')
+      .update({ username: username.toLowerCase() })
+      .eq('student_id', studentId);
+
+    if (error) {
+      console.error('Error updating username:', error);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error updating username:', error);
     return false;
   }
 }
@@ -1807,6 +1846,48 @@ export async function updateFeatureRequestStatus(
     return true;
   } catch (error) {
     console.error('Error updating feature request status:', error);
+    return false;
+  }
+}
+
+// Update student groups (replace all existing groups with new ones)
+export async function updateStudentGroups(studentId: string, groupIds: string[]): Promise<boolean> {
+  try {
+    // First delete all existing group memberships
+    const { error: deleteError } = await supabase
+      .from('student_groups')
+      .delete()
+      .eq('student_id', studentId);
+    
+    if (deleteError) {
+      console.error('Error deleting existing student groups:', deleteError);
+      return false;
+    }
+    
+    // If no new groups, we're done
+    if (groupIds.length === 0) {
+      return true;
+    }
+    
+    // Add new group memberships
+    const groupInserts = groupIds.map(groupId => ({
+      student_id: studentId,
+      group_id: groupId,
+      joined_at: new Date().toISOString()
+    }));
+    
+    const { error: insertError } = await supabase
+      .from('student_groups')
+      .insert(groupInserts);
+    
+    if (insertError) {
+      console.error('Error inserting new student groups:', insertError);
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error updating student groups:', error);
     return false;
   }
 } 

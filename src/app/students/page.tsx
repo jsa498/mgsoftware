@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, ChangeEvent } from "react";
-import { PlusCircle, Search, Trash2, Eye, EyeOff, AlertTriangle, MinusCircle } from "lucide-react";
+import { PlusCircle, Search, Trash2, Eye, EyeOff, AlertTriangle, MinusCircle, Phone, User, UsersRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -41,10 +41,13 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { getAllStudents, getStudentGroups, getStudentFeeInfo, getAllGroups, deleteStudent, updateFeePaidUntil, createStudentFeeRecord } from "@/lib/data-service";
+import { getAllStudents, getStudentGroups, getStudentFeeInfo, getAllGroups, deleteStudent, updateFeePaidUntil, createStudentFeeRecord, updateStudentProfile, updateUsername, updateStudentGroups } from "@/lib/data-service";
 import { Student, Group, Fee } from "@/lib/types";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/components/ui/use-toast";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserCircle2 } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
 
 export default function StudentsPage() {
   const [students, setStudents] = useState<Student[]>([]);
@@ -69,6 +72,17 @@ export default function StudentsPage() {
   const [studentToDelete, setStudentToDelete] = useState<Student | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUpdatingFee, setIsUpdatingFee] = useState<Record<string, boolean>>({});
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [studentUsername, setStudentUsername] = useState("");
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [editingPhone, setEditingPhone] = useState("");
+  const [savingPhone, setSavingPhone] = useState(false);
+  const [editingFirstName, setEditingFirstName] = useState("");
+  const [editingLastName, setEditingLastName] = useState("");
+  const [editingUsername, setEditingUsername] = useState("");
+  const [savingUserInfo, setSavingUserInfo] = useState(false);
+  const [editModalGroups, setEditModalGroups] = useState<string[]>([]);
+  const [savingGroups, setSavingGroups] = useState(false);
 
   useEffect(() => {
     const fetchStudents = async () => {
@@ -116,6 +130,21 @@ export default function StudentsPage() {
       fetchGroups();
     }
   }, [isDialogOpen]);
+
+  // Also load available groups when profile modal opens
+  useEffect(() => {
+    if (profileModalOpen) {
+      const fetchGroups = async () => {
+        try {
+          const groups = await getAllGroups();
+          setAvailableGroups(groups);
+        } catch (error) {
+          console.error("Error fetching groups:", error);
+        }
+      };
+      fetchGroups();
+    }
+  }, [profileModalOpen]);
 
   useEffect(() => {
     if (searchQuery) {
@@ -426,6 +455,201 @@ export default function StudentsPage() {
     }
   };
 
+  const handleOpenProfile = async (student: Student) => {
+    setSelectedStudent(student);
+    setEditingFirstName(student.first_name);
+    setEditingLastName(student.last_name);
+    setEditingPhone(student.phone || "");
+    
+    // Get groups for the modal
+    const groups = await getStudentGroups(student.id);
+    setEditModalGroups(groups.map(g => g.id));
+    
+    // Get student username
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('username')
+        .eq('student_id', student.id)
+        .single();
+        
+      if (!error && data) {
+        setStudentUsername(data.username);
+        setEditingUsername(data.username);
+      } else {
+        setStudentUsername("");
+        setEditingUsername("");
+      }
+      
+      setProfileModalOpen(true);
+    } catch (error) {
+      console.error("Error fetching student username:", error);
+      setStudentUsername("");
+      setEditingUsername("");
+      setProfileModalOpen(true);
+    }
+  };
+  
+  const handleUpdatePhone = async () => {
+    if (!selectedStudent) return;
+    
+    try {
+      setSavingPhone(true);
+      const success = await updateStudentProfile(selectedStudent.id, { phone: editingPhone });
+      
+      if (success) {
+        // Update the local state
+        setStudents(students.map(s => 
+          s.id === selectedStudent.id ? { ...s, phone: editingPhone } : s
+        ));
+        setFilteredStudents(filteredStudents.map(s => 
+          s.id === selectedStudent.id ? { ...s, phone: editingPhone } : s
+        ));
+        setSelectedStudent(prev => prev ? { ...prev, phone: editingPhone } : null);
+        
+        toast({
+          title: "Success",
+          description: "Phone number updated successfully",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to update phone number",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error updating phone:", error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingPhone(false);
+    }
+  };
+
+  const handleUpdateUserInfo = async () => {
+    if (!selectedStudent) return;
+    
+    try {
+      setSavingUserInfo(true);
+      
+      // Update name if changed
+      if (editingFirstName !== selectedStudent.first_name || editingLastName !== selectedStudent.last_name) {
+        const nameUpdateSuccess = await updateStudentProfile(selectedStudent.id, { 
+          first_name: editingFirstName,
+          last_name: editingLastName 
+        });
+        
+        if (nameUpdateSuccess) {
+          // Update local state
+          setStudents(students.map(s => 
+            s.id === selectedStudent.id 
+              ? { ...s, first_name: editingFirstName, last_name: editingLastName } 
+              : s
+          ));
+          setFilteredStudents(filteredStudents.map(s => 
+            s.id === selectedStudent.id 
+              ? { ...s, first_name: editingFirstName, last_name: editingLastName } 
+              : s
+          ));
+          setSelectedStudent(prev => prev ? { ...prev, first_name: editingFirstName, last_name: editingLastName } : null);
+        } else {
+          toast({
+            title: "Error",
+            description: "Failed to update name",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+      
+      // Update username if changed
+      if (editingUsername !== studentUsername) {
+        const usernameUpdateSuccess = await updateUsername(selectedStudent.id, editingUsername);
+        
+        if (usernameUpdateSuccess) {
+          setStudentUsername(editingUsername);
+          toast({
+            title: "Success",
+            description: "Username updated successfully",
+          });
+        } else {
+          toast({
+            title: "Error",
+            description: "This username is already taken or invalid",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+      
+      toast({
+        title: "Success",
+        description: "Student information updated successfully",
+      });
+    } catch (error) {
+      console.error("Error updating student info:", error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingUserInfo(false);
+    }
+  };
+  
+  const handleUpdateGroups = async () => {
+    if (!selectedStudent) return;
+    
+    try {
+      setSavingGroups(true);
+      const success = await updateStudentGroups(selectedStudent.id, editModalGroups);
+      
+      if (success) {
+        // Get updated groups
+        const updatedGroups = await getStudentGroups(selectedStudent.id);
+        
+        // Update local state
+        setStudentGroups(prev => ({
+          ...prev,
+          [selectedStudent.id]: updatedGroups
+        }));
+        
+        toast({
+          title: "Success",
+          description: "Group memberships updated successfully",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to update group memberships",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error updating groups:", error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingGroups(false);
+    }
+  };
+  
+  const handleToggleModalGroup = (groupId: string) => {
+    setEditModalGroups(current => 
+      current.includes(groupId)
+        ? current.filter(id => id !== groupId)
+        : [...current, groupId]
+    );
+  };
+
   return (
     <div className="container mx-auto p-4">
       <div className="flex justify-between items-center mb-6">
@@ -573,6 +797,168 @@ export default function StudentsPage() {
         </div>
       </div>
 
+      {/* Student Profile Modal */}
+      <Dialog open={profileModalOpen} onOpenChange={setProfileModalOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Student Profile</DialogTitle>
+            <DialogDescription>
+              View and manage student information
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedStudent && (
+            <div className="space-y-6">
+              <div className="flex flex-col md:flex-row gap-6">
+                <div>
+                  <Avatar className="h-32 w-32">
+                    {(selectedStudent as Student & { profile_image_url?: string }).profile_image_url ? (
+                      <AvatarImage src={(selectedStudent as Student & { profile_image_url?: string }).profile_image_url} alt={`${selectedStudent.first_name} ${selectedStudent.last_name}`} />
+                    ) : (
+                      <AvatarFallback className="text-4xl">
+                        <UserCircle2 className="h-16 w-16" />
+                      </AvatarFallback>
+                    )}
+                  </Avatar>
+                </div>
+                
+                <div className="flex-1 space-y-4">
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Label htmlFor="username">Username</Label>
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        id="username"
+                        placeholder="Enter username"
+                        value={editingUsername}
+                        onChange={(e) => setEditingUsername(e.target.value)}
+                        className="flex-1"
+                      />
+                    </div>
+                  </div>
+                
+                  <div>
+                    <h3 className="font-medium flex items-center gap-2 text-muted-foreground">
+                      <User className="h-4 w-4" /> Full Name
+                    </h3>
+                    <div className="grid grid-cols-2 gap-2 mt-2">
+                      <Input
+                        placeholder="First name"
+                        value={editingFirstName}
+                        onChange={(e) => setEditingFirstName(e.target.value)}
+                      />
+                      <Input
+                        placeholder="Last name"
+                        value={editingLastName}
+                        onChange={(e) => setEditingLastName(e.target.value)}
+                      />
+                    </div>
+                    <div className="mt-2">
+                      <Button 
+                        onClick={handleUpdateUserInfo}
+                        disabled={savingUserInfo}
+                        size="sm"
+                      >
+                        {savingUserInfo ? "Saving..." : "Save Changes"}
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Phone className="h-4 w-4 text-muted-foreground" />
+                      <Label htmlFor="phone">Phone Number</Label>
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        id="phone"
+                        placeholder="Enter phone number"
+                        value={editingPhone}
+                        onChange={(e) => setEditingPhone(e.target.value)}
+                        className="flex-1"
+                      />
+                      <Button 
+                        onClick={handleUpdatePhone}
+                        disabled={savingPhone}
+                        size="sm"
+                      >
+                        Save
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <Separator />
+              
+              <div>
+                <h3 className="font-medium flex items-center gap-2 mb-4 text-muted-foreground">
+                  <UsersRound className="h-4 w-4" /> Groups
+                </h3>
+                
+                <div className="mb-3">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button 
+                        variant="outline" 
+                        className="w-full justify-between"
+                      >
+                        Manage Groups
+                        <PlusCircle size={16} className="ml-2" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[400px] p-0" align="start">
+                      <div className="p-4 max-h-[300px] overflow-y-auto">
+                        {availableGroups.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">No groups available</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {availableGroups.map((group) => (
+                              <div key={group.id} className="flex items-center space-x-2">
+                                <Checkbox 
+                                  id={`modal-group-${group.id}`} 
+                                  checked={editModalGroups.includes(group.id)}
+                                  onCheckedChange={() => handleToggleModalGroup(group.id)}
+                                />
+                                <Label htmlFor={`modal-group-${group.id}`} className="flex-1 cursor-pointer">
+                                  {group.name}
+                                </Label>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div className="border-t p-3 flex justify-end">
+                        <Button 
+                          onClick={handleUpdateGroups}
+                          disabled={savingGroups}
+                          size="sm"
+                        >
+                          {savingGroups ? "Saving..." : "Save Groups"}
+                        </Button>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                
+                <div className="flex flex-wrap gap-2">
+                  {studentGroups[selectedStudent.id] && studentGroups[selectedStudent.id].length > 0 ? (
+                    studentGroups[selectedStudent.id].map((group) => (
+                      <Badge key={group.id} variant="secondary" className="text-sm py-1">
+                        {group.name}
+                      </Badge>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No groups assigned</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {loading ? (
         <div className="text-center py-8">Loading students data...</div>
       ) : (
@@ -600,7 +986,12 @@ export default function StudentsPage() {
                 filteredStudents.map((student) => (
                   <TableRow key={student.id}>
                     <TableCell className="font-medium">
-                      {student.first_name} {student.last_name}
+                      <button 
+                        onClick={() => handleOpenProfile(student)}
+                        className="hover:underline hover:text-primary cursor-pointer text-left"
+                      >
+                        {student.first_name} {student.last_name}
+                      </button>
                     </TableCell>
                     <TableCell>{student.phone || "+1(000) 000-0000"}</TableCell>
                     <TableCell className="max-w-md truncate">

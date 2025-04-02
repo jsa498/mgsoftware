@@ -34,6 +34,7 @@ export default function ProfilePage() {
   } | null>(null)
   const [phone, setPhone] = useState("")
   const [photoUrl, setPhotoUrl] = useState<string | null>(null)
+  const [username, setUsername] = useState("")
 
   // Get student profile data
   const fetchProfile = useCallback(async () => {
@@ -45,6 +46,8 @@ export default function ProfilePage() {
         router.push("/auth/login")
         return
       }
+      
+      setUsername(user.username)
       
       const profileData = await getStudentProfileByUserId(user.id)
       
@@ -193,7 +196,7 @@ export default function ProfilePage() {
         
         <Card>
           <CardHeader>
-            <CardTitle>Student Profile</CardTitle>
+            <CardTitle>{username}</CardTitle>
             <CardDescription>
               View and manage your personal information
             </CardDescription>
