@@ -13,10 +13,10 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { FileUpload } from "@/components/FileUpload"
 import { toast } from "@/components/ui/use-toast"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Phone, User, UserCircle2, UsersRound } from "lucide-react"
+import { ProfileImageUpload } from "@/components/ProfileImageUpload"
 
 export default function ProfilePage() {
   const router = useRouter()
@@ -123,9 +123,7 @@ export default function ProfilePage() {
     }
   }
 
-  const handleProfileImageChange = async (file: File | null) => {
-    setProfileImage(file)
-    
+  const handleProfileImageChange = async (file: File) => {
     if (file && profile) {
       try {
         setSaving(true)
@@ -206,26 +204,11 @@ export default function ProfilePage() {
           <CardContent className="space-y-6">
             <div className="flex flex-col md:flex-row gap-6">
               <div>
-                <div className="mb-4">
-                  <Avatar className="h-32 w-32">
-                    {photoUrl ? (
-                      <AvatarImage src={photoUrl} alt={`${profile?.first_name} ${profile?.last_name}`} />
-                    ) : (
-                      <AvatarFallback className="text-4xl">
-                        <UserCircle2 className="h-16 w-16" />
-                      </AvatarFallback>
-                    )}
-                  </Avatar>
-                </div>
-                
-                <div className="max-w-xs">
-                  <FileUpload
-                    file={profileImage}
-                    onFileChange={handleProfileImageChange}
-                    accept="image/*"
-                    maxSize={5 * 1024 * 1024} // 5MB max
-                  />
-                </div>
+                <ProfileImageUpload 
+                  imageUrl={photoUrl}
+                  fullName={profile ? `${profile.first_name} ${profile.last_name}` : ""}
+                  onImageSelect={handleProfileImageChange}
+                />
               </div>
               
               <div className="flex-1 space-y-4">
@@ -249,34 +232,37 @@ export default function ProfilePage() {
                       placeholder="Enter phone number"
                       value={phone}
                       onChange={handlePhoneChange}
+                      className="flex-1"
                     />
-                    <Button onClick={handlePhoneUpdate} disabled={saving}>
-                      {saving ? "Saving..." : "Save"}
+                    <Button 
+                      onClick={handlePhoneUpdate}
+                      disabled={saving}
+                      size="sm"
+                    >
+                      Save
                     </Button>
                   </div>
                 </div>
               </div>
             </div>
             
-            <Separator />
-            
-            <div>
-              <h3 className="font-medium flex items-center gap-2 mb-3">
-                <UsersRound className="h-4 w-4" /> Groups
-              </h3>
-              
-              {profile?.groups && profile.groups.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {profile.groups.map((group) => (
-                    <Badge key={group.id} variant="secondary">
-                      {group.name}
-                    </Badge>
-                  ))}
+            {profile?.groups && profile.groups.length > 0 && (
+              <>
+                <Separator />
+                <div>
+                  <h3 className="font-medium flex items-center gap-2 mb-4 text-muted-foreground">
+                    <UsersRound className="h-4 w-4" /> Groups
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    {profile.groups.map((group) => (
+                      <Badge key={group.id} variant="secondary" className="text-sm py-1">
+                        {group.name}
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
-              ) : (
-                <p className="text-muted-foreground">You are not part of any groups yet.</p>
-              )}
-            </div>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
