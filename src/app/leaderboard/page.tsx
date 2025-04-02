@@ -10,6 +10,7 @@ import {
   MoreVertical,
   BarChart2,
   RotateCcw,
+  Clock,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,22 @@ import { getPracticeLeaderboard, getQuizLeaderboard, updateQuizPoints } from "@/
 import { toast } from "@/components/ui/use-toast";
 import { isAdmin } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { supabase } from "@/lib/supabase";
 
 // Define types for our leaderboard data
 type PracticeLeaderboardItem = {
@@ -49,6 +66,12 @@ export default function Leaderboard() {
   const [quizData, setQuizData] = useState<QuizLeaderboardItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [isUserAdmin, setIsUserAdmin] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
+  const [timeDialogOpen, setTimeDialogOpen] = useState(false);
+  const [timeAction, setTimeAction] = useState<"add" | "deduct">("add");
+  const [timeAmount, setTimeAmount] = useState<string>("15");
+  const [timeHours, setTimeHours] = useState<string>("0");
+  const [timeMinutes, setTimeMinutes] = useState<string>("15");
   
   // Fetch leaderboard data on component mount
   useEffect(() => {
@@ -123,6 +146,99 @@ export default function Leaderboard() {
       description: "This functionality has not been implemented yet.",
       variant: "destructive",
     });
+  };
+  
+  // Function to update practice time
+  const handleUpdatePracticeTime = async (studentId: string, minutesToAdd: number) => {
+    try {
+      // Find the student in practice data
+      const studentIndex = practiceData.findIndex(s => s.student_id === studentId);
+      if (studentIndex === -1) {
+        throw new Error("Student not found");
+      }
+      
+      const student = practiceData[studentIndex];
+      const currentTime = student.time;
+      
+      // Parse current time (format: "2h 54m")
+      const hourMatch = currentTime.match(/(\d+)h/);
+      const minuteMatch = currentTime.match(/(\d+)m/);
+      
+      const hours = hourMatch ? parseInt(hourMatch[1]) : 0;
+      const minutes = minuteMatch ? parseInt(minuteMatch[1]) : 0;
+      
+      // Calculate total minutes being added/deducted
+      let minuteDelta = minutesToAdd;
+      
+      // Calculate points (2 points per hour)
+      const pointsDelta = (minuteDelta / 60) * 2;
+      
+      // Instead of updating an existing session, create a new adjustment session
+      // This ensures the leaderboard aggregation works correctly
+      const { data, error } = await supabase
+        .from('practice_sessions')
+        .insert({
+          student_id: studentId,
+          duration_minutes: minuteDelta,
+          points: pointsDelta.toFixed(2),
+          status: 'completed',
+          started_at: new Date().toISOString(),
+          completed_at: new Date().toISOString(),
+          created_at: new Date().toISOString()
+        });
+      
+      if (error) throw error;
+      
+      // Refresh leaderboard data
+      fetchLeaderboardData();
+      
+      toast({
+        title: "Success",
+        description: `Practice time ${minutesToAdd > 0 ? "increased" : "decreased"} successfully.`,
+      });
+      
+      return true;
+    } catch (error) {
+      console.error("Error updating practice time:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update practice time. Please try again.",
+        variant: "destructive",
+      });
+      return false;
+    }
+  };
+  
+  // Function to handle time dialog submission
+  const handleTimeDialogSubmit = async () => {
+    if (!selectedStudent) return;
+    
+    const hours = parseInt(timeHours) || 0;
+    const minutes = parseInt(timeMinutes) || 0;
+    const totalMinutes = (hours * 60) + minutes;
+    
+    if (totalMinutes <= 0) {
+      toast({
+        title: "Invalid time",
+        description: "Please enter a valid time greater than 0.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    const minutesToAdd = timeAction === "add" ? totalMinutes : -totalMinutes;
+    await handleUpdatePracticeTime(selectedStudent, minutesToAdd);
+    
+    // Close dialog
+    setTimeDialogOpen(false);
+  };
+  
+  // Function to open time dialog
+  const openTimeDialog = (studentId: string) => {
+    setSelectedStudent(studentId);
+    setTimeHours("0");
+    setTimeMinutes("15");
+    setTimeDialogOpen(true);
   };
   
   // Filter practice data based on search query
@@ -235,8 +351,12 @@ export default function Leaderboard() {
                       </TableCell>
                       {isUserAdmin && (
                         <TableCell>
-                          <Button variant="ghost" size="icon">
-                            <MoreVertical className="h-4 w-4" />
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={() => openTimeDialog(student.student_id)}
+                          >
+                            <Clock className="h-4 w-4" />
                           </Button>
                         </TableCell>
                       )}
@@ -324,6 +444,76 @@ export default function Leaderboard() {
           )}
         </TabsContent>
       </Tabs>
+      
+      {/* Time Dialog */}
+      <Dialog open={timeDialogOpen} onOpenChange={setTimeDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Adjust Practice Time</DialogTitle>
+            <DialogDescription>
+              Add or deduct practice time for this student. Points will be automatically adjusted based on time.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-6 py-4">
+            <div className="flex justify-center space-x-2">
+              <div className="inline-flex items-center rounded-md border p-1">
+                <Button 
+                  variant={timeAction === "add" ? "default" : "outline"} 
+                  className="rounded-sm px-3"
+                  onClick={() => setTimeAction("add")}
+                >
+                  Add
+                </Button>
+                <Button 
+                  variant={timeAction === "deduct" ? "default" : "outline"} 
+                  className="rounded-sm px-3"
+                  onClick={() => setTimeAction("deduct")}
+                >
+                  Deduct
+                </Button>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 items-center gap-4">
+              <div>
+                <label htmlFor="hours" className="text-sm font-medium mb-1 block">
+                  Hours
+                </label>
+                <Input
+                  id="hours"
+                  type="number"
+                  min="0"
+                  value={timeHours}
+                  onChange={(e) => setTimeHours(e.target.value)}
+                  placeholder="0"
+                />
+              </div>
+              <div>
+                <label htmlFor="minutes" className="text-sm font-medium mb-1 block">
+                  Minutes
+                </label>
+                <Input
+                  id="minutes"
+                  type="number"
+                  min="0"
+                  max="59"
+                  value={timeMinutes}
+                  onChange={(e) => setTimeMinutes(e.target.value)}
+                  placeholder="15"
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTimeDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleTimeDialogSubmit}>
+              {timeAction === "add" ? "Add Time" : "Deduct Time"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 } 

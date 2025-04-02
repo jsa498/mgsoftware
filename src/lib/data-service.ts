@@ -756,7 +756,7 @@ export async function getOptimizedPracticeLeaderboard() {
       // Format time as hours and minutes
       const hours = Math.floor(totalMinutes / 60);
       const minutes = totalMinutes % 60;
-      const formattedTime = `${hours}:${minutes.toString().padStart(2, '0')}m`;
+      const formattedTime = `${hours}h ${minutes.toString().padStart(2, '0')}m`;
       
       return {
         student_id: student.id,
