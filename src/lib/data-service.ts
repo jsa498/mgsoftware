@@ -79,12 +79,13 @@ export async function getRecentActivity(): Promise<RecentActivity[]> {
 /**
  * Fetches fee alerts
  */
-export async function getFeeAlerts(): Promise<FeeAlert[]> {
+export async function getFeeAlerts(page = 1, limit = 100): Promise<FeeAlert[]> {
   try {
     const { data, error } = await supabase
       .from('fee_alerts')
       .select('*')
-      .limit(10);
+      .order('paid_until', { ascending: true })
+      .range((page - 1) * limit, page * limit - 1);
     
     if (error) throw error;
     
