@@ -181,7 +181,9 @@ export default function Leaderboard() {
         
         <TabsContent value="practice" className="rounded-lg border bg-card">
           {loading ? (
-            <div className="text-center py-8">Loading practice data...</div>
+            <div className="flex justify-center items-center h-64">
+              <p>Loading practice data...</p>
+            </div>
           ) : (
             <Table>
               <TableHeader>
@@ -248,7 +250,9 @@ export default function Leaderboard() {
         
         <TabsContent value="quiz" className="rounded-lg border bg-card">
           {loading ? (
-            <div className="text-center py-8">Loading quiz data...</div>
+            <div className="flex justify-center items-center h-64">
+              <p>Loading quiz data...</p>
+            </div>
           ) : (
             <Table>
               <TableHeader>

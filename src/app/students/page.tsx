@@ -41,7 +41,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { getAllStudents, getStudentGroups, getStudentFeeInfo, getAllGroups, deleteStudent, updateFeePaidUntil, createStudentFeeRecord, updateStudentProfile, updateUsername, updateStudentGroups } from "@/lib/data-service";
+import { getStudentGroups, getStudentFeeInfo, getAllGroups, deleteStudent, updateFeePaidUntil, createStudentFeeRecord, updateStudentProfile, updateUsername, updateStudentGroups, getStudentsWithDetails, searchStudents } from "@/lib/data-service";
 import { Student, Group, Fee } from "@/lib/types";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/components/ui/use-toast";
@@ -53,6 +53,7 @@ export default function StudentsPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [filteredStudents, setFilteredStudents] = useState<Student[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
   const [studentGroups, setStudentGroups] = useState<Record<string, Group[]>>({});
   const [studentFees, setStudentFees] = useState<Record<string, Fee | null>>({});
   const [loading, setLoading] = useState(true);
@@ -88,24 +89,15 @@ export default function StudentsPage() {
     const fetchStudents = async () => {
       try {
         setLoading(true);
-        const allStudents = await getAllStudents();
-        setStudents(allStudents);
-        setFilteredStudents(allStudents);
         
-        // Fetch groups for each student
-        const groupsData: Record<string, Group[]> = {};
-        const feesData: Record<string, Fee | null> = {};
+        // Use the optimized function to get all students at once
+        const { students: fetchedStudents, studentGroups: fetchedGroups, 
+                studentFees: fetchedFees } = await getStudentsWithDetails();
         
-        for (const student of allStudents) {
-          const groups = await getStudentGroups(student.id);
-          groupsData[student.id] = groups;
-          
-          const feeInfo = await getStudentFeeInfo(student.id);
-          feesData[student.id] = feeInfo;
-        }
-        
-        setStudentGroups(groupsData);
-        setStudentFees(feesData);
+        setStudents(fetchedStudents);
+        setFilteredStudents(fetchedStudents);
+        setStudentGroups(fetchedGroups);
+        setStudentFees(fetchedFees);
       } catch (error) {
         console.error("Error fetching students data:", error);
       } finally {
@@ -114,7 +106,7 @@ export default function StudentsPage() {
     };
 
     fetchStudents();
-  }, []);
+  }, []); // Only fetch on initial load
 
   // Fetch all available groups when the dialog opens
   useEffect(() => {
@@ -146,17 +138,47 @@ export default function StudentsPage() {
     }
   }, [profileModalOpen]);
 
+  // Updated search logic with debounce
   useEffect(() => {
-    if (searchQuery) {
-      const filtered = students.filter(
-        (student) =>
-          `${student.first_name} ${student.last_name}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          student.phone?.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-      setFilteredStudents(filtered);
-    } else {
-      setFilteredStudents(students);
-    }
+    const fetchSearchResults = async () => {
+      // If search query is empty, show the current page data
+      if (!searchQuery) {
+        setFilteredStudents(students);
+        return;
+      }
+      
+      setIsSearching(true);
+      
+      try {
+        // Use server-side search for more accurate results
+        const { students: searchResults, studentGroups: searchGroups, studentFees: searchFees } = 
+          await searchStudents(searchQuery);
+        
+        setFilteredStudents(searchResults);
+        
+        // Update groups and fees for the searched students
+        setStudentGroups(prev => ({
+          ...prev,
+          ...searchGroups
+        }));
+        
+        setStudentFees(prev => ({
+          ...prev,
+          ...searchFees
+        }));
+      } catch (error) {
+        console.error("Error searching students:", error);
+      } finally {
+        setIsSearching(false);
+      }
+    };
+
+    // Debounce search to avoid excessive API calls
+    const debounceTimer = setTimeout(() => {
+      fetchSearchResults();
+    }, 300);
+
+    return () => clearTimeout(debounceTimer);
   }, [searchQuery, students]);
 
   const formatGroupsString = (groups: Group[]) => {
@@ -328,13 +350,10 @@ export default function StudentsPage() {
         }
       }
       
-      // Success! Refresh the student list
-      toast({
-        title: "Student registered",
-        description: `${firstName} ${lastName} has been successfully registered.`
-      });
+      // After successful creation:
+      setIsDialogOpen(false);
       
-      // Reset form
+      // Reset form fields
       setFirstName("");
       setLastName("");
       setContactNumber("");
@@ -342,26 +361,20 @@ export default function StudentsPage() {
       setShowPin(false);
       setIsExemptFromFees(false);
       setSelectedGroupIds([]);
-      setIsDialogOpen(false);
       
-      // Refresh students data
-      const allStudents = await getAllStudents();
-      setStudents(allStudents);
-      setFilteredStudents(allStudents);
+      // Refresh all student data
+      const { students: fetchedStudents, studentGroups: fetchedGroups, 
+              studentFees: fetchedFees } = await getStudentsWithDetails();
       
-      // Fetch groups for new student
-      const groups = await getStudentGroups(studentData.id);
-      setStudentGroups(prev => ({
-        ...prev,
-        [studentData.id]: groups
-      }));
+      setStudents(fetchedStudents);
+      setFilteredStudents(fetchedStudents);
+      setStudentGroups(fetchedGroups);
+      setStudentFees(fetchedFees);
       
-      // Fetch fee info for new student
-      const feeInfo = await getStudentFeeInfo(studentData.id);
-      setStudentFees(prev => ({
-        ...prev,
-        [studentData.id]: feeInfo
-      }));
+      toast({
+        title: "Student registered successfully",
+        description: `${firstName} ${lastName} has been registered.`,
+      });
     } catch (error: Error | unknown) {
       console.error("Error registering student:", error);
       toast({
@@ -391,18 +404,23 @@ export default function StudentsPage() {
       const success = await deleteStudent(studentToDelete.id);
       
       if (success) {
+        setDeleteDialogOpen(false);
+        
+        // Refresh all student data
+        const { students: fetchedStudents, studentGroups: fetchedGroups, 
+                studentFees: fetchedFees } = await getStudentsWithDetails();
+        
+        setStudents(fetchedStudents);
+        setFilteredStudents(fetchedStudents);
+        setStudentGroups(fetchedGroups);
+        setStudentFees(fetchedFees);
+        
         toast({
           title: "Student deleted",
-          description: `${studentToDelete.first_name} ${studentToDelete.last_name} has been successfully deleted.`,
+          description: `${studentToDelete.first_name} ${studentToDelete.last_name} has been deleted.`,
         });
-        
-        // Update the student list
-        setStudents(students.filter(s => s.id !== studentToDelete.id));
-        setFilteredStudents(filteredStudents.filter(s => s.id !== studentToDelete.id));
-      } else {
-        throw new Error("Failed to delete student");
       }
-    } catch (error: Error | unknown) {
+    } catch (error) {
       console.error("Error deleting student:", error);
       toast({
         title: "Deletion failed",
@@ -411,7 +429,6 @@ export default function StudentsPage() {
       });
     } finally {
       setIsDeleting(false);
-      setDeleteDialogOpen(false);
       setStudentToDelete(null);
     }
   };
@@ -425,8 +442,9 @@ export default function StudentsPage() {
       const success = await updateFeePaidUntil(feeId, months);
       
       if (success) {
-        // Refresh the fee data for this student
+        // After successful update, only update the specific student's fee info
         const updatedFeeInfo = await getStudentFeeInfo(studentId);
+        
         setStudentFees(prev => ({
           ...prev,
           [studentId]: updatedFeeInfo
@@ -544,16 +562,18 @@ export default function StudentsPage() {
         });
         
         if (nameUpdateSuccess) {
-          // Update local state
-          setStudents(students.map(s => 
+          // After successful update, update the student in the current list
+          const updatedStudents = students.map(s => 
             s.id === selectedStudent.id 
-              ? { ...s, first_name: editingFirstName, last_name: editingLastName } 
+              ? { ...s, first_name: editingFirstName, last_name: editingLastName }
               : s
-          ));
-          setFilteredStudents(filteredStudents.map(s => 
-            s.id === selectedStudent.id 
-              ? { ...s, first_name: editingFirstName, last_name: editingLastName } 
-              : s
+          );
+          
+          setStudents(updatedStudents);
+          setFilteredStudents(updatedStudents.filter(
+            (student) =>
+              `${student.first_name} ${student.last_name}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
+              student.phone?.toLowerCase().includes(searchQuery.toLowerCase())
           ));
           setSelectedStudent(prev => prev ? { ...prev, first_name: editingFirstName, last_name: editingLastName } : null);
         } else {
@@ -655,8 +675,8 @@ export default function StudentsPage() {
       <div className="flex justify-between items-center mb-6">
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="flex items-center gap-2">
-              <PlusCircle size={18} />
+            <Button>
+              <PlusCircle className="mr-2 h-4 w-4" />
               Register Student
             </Button>
           </DialogTrigger>
@@ -797,6 +817,141 @@ export default function StudentsPage() {
         </div>
       </div>
 
+      {loading ? (
+        <div className="flex justify-center items-center h-64">
+          <p>Loading students data...</p>
+        </div>
+      ) : (
+        <div className="w-full">
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>NAME</TableHead>
+                  <TableHead>CONTACT</TableHead>
+                  <TableHead>GROUPS</TableHead>
+                  <TableHead>FEES PAID TILL</TableHead>
+                  <TableHead>ACTIONS</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isSearching ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8">
+                      Searching...
+                    </TableCell>
+                  </TableRow>
+                ) : filteredStudents.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8">
+                      {students.length === 0
+                        ? "No students registered yet. Click 'Register Student' to add one."
+                        : "No students match your search query."}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredStudents.map((student) => (
+                    <TableRow key={student.id}>
+                      <TableCell className="font-medium">
+                        <button 
+                          onClick={() => handleOpenProfile(student)}
+                          className="hover:underline hover:text-primary cursor-pointer text-left"
+                        >
+                          {student.first_name} {student.last_name}
+                        </button>
+                      </TableCell>
+                      <TableCell>{student.phone || "+1(000) 000-0000"}</TableCell>
+                      <TableCell className="max-w-md truncate">
+                        {formatGroupsString(studentGroups[student.id] || [])}
+                      </TableCell>
+                      <TableCell>
+                        {studentFees[student.id] && (
+                          <div className="flex items-center space-x-1">
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={() => handleFeePeriodUpdate(studentFees[student.id]!.id, student.id, -1)}
+                              disabled={isUpdatingFee[student.id]}
+                            >
+                              <MinusCircle size={14} />
+                            </Button>
+                            <Badge 
+                              variant="default" 
+                              className={studentFees[student.id] ? getFeeStatusColor(studentFees[student.id]) : ""}
+                            >
+                              {formatFeePaidUntil(studentFees[student.id])}
+                            </Badge>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={() => handleFeePeriodUpdate(studentFees[student.id]!.id, student.id, 1)}
+                              disabled={isUpdatingFee[student.id]}
+                            >
+                              <PlusCircle size={14} />
+                            </Button>
+                          </div>
+                        )}
+                        {!studentFees[student.id] && (
+                          <Badge>—</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex space-x-2">
+                          <AlertDialog open={deleteDialogOpen && studentToDelete?.id === student.id} onOpenChange={(open: boolean) => {
+                            setDeleteDialogOpen(open);
+                            if (!open) setStudentToDelete(null);
+                          }}>
+                            <AlertDialogTrigger asChild>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="text-red-500"
+                                onClick={() => {
+                                  setStudentToDelete(student);
+                                  setDeleteDialogOpen(true);
+                                }}
+                              >
+                                <Trash2 size={18} />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle className="flex items-center gap-2">
+                                  <AlertTriangle className="h-5 w-5 text-red-500" />
+                                  Delete Student
+                                </AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete {student.first_name} {student.last_name}? This action cannot be undone and will remove all associated data including groups, fees, and attendance records.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                                    e.preventDefault();
+                                    handleDeleteStudent();
+                                  }}
+                                  className="bg-red-500 hover:bg-red-600"
+                                  disabled={isDeleting}
+                                >
+                                  {isDeleting ? "Deleting..." : "Delete"}
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      )}
+      
       {/* Student Profile Modal */}
       <Dialog open={profileModalOpen} onOpenChange={setProfileModalOpen}>
         <DialogContent className="sm:max-w-[600px]">
@@ -958,131 +1113,6 @@ export default function StudentsPage() {
           )}
         </DialogContent>
       </Dialog>
-
-      {loading ? (
-        <div className="text-center py-8">Loading students data...</div>
-      ) : (
-        <div className="overflow-x-auto border rounded-lg">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>NAME</TableHead>
-                <TableHead>CONTACT</TableHead>
-                <TableHead className="max-w-md">GROUPS</TableHead>
-                <TableHead>FEES PAID TILL</TableHead>
-                <TableHead>ACTIONS</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredStudents.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8">
-                    {students.length === 0
-                      ? "No students registered yet. Click 'Register Student' to add one."
-                      : "No students match your search query."}
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredStudents.map((student) => (
-                  <TableRow key={student.id}>
-                    <TableCell className="font-medium">
-                      <button 
-                        onClick={() => handleOpenProfile(student)}
-                        className="hover:underline hover:text-primary cursor-pointer text-left"
-                      >
-                        {student.first_name} {student.last_name}
-                      </button>
-                    </TableCell>
-                    <TableCell>{student.phone || "+1(000) 000-0000"}</TableCell>
-                    <TableCell className="max-w-md truncate">
-                      {formatGroupsString(studentGroups[student.id] || [])}
-                    </TableCell>
-                    <TableCell>
-                      {studentFees[student.id] && (
-                        <div className="flex items-center space-x-1">
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-6 w-6"
-                            onClick={() => handleFeePeriodUpdate(studentFees[student.id]!.id, student.id, -1)}
-                            disabled={isUpdatingFee[student.id]}
-                          >
-                            <MinusCircle size={14} />
-                          </Button>
-                          <Badge 
-                            variant="default" 
-                            className={studentFees[student.id] ? getFeeStatusColor(studentFees[student.id]) : ""}
-                          >
-                            {formatFeePaidUntil(studentFees[student.id])}
-                          </Badge>
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-6 w-6"
-                            onClick={() => handleFeePeriodUpdate(studentFees[student.id]!.id, student.id, 1)}
-                            disabled={isUpdatingFee[student.id]}
-                          >
-                            <PlusCircle size={14} />
-                          </Button>
-                        </div>
-                      )}
-                      {!studentFees[student.id] && (
-                        <Badge>—</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex space-x-2">
-                        <AlertDialog open={deleteDialogOpen && studentToDelete?.id === student.id} onOpenChange={(open: boolean) => {
-                          setDeleteDialogOpen(open);
-                          if (!open) setStudentToDelete(null);
-                        }}>
-                          <AlertDialogTrigger asChild>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="text-red-500"
-                              onClick={() => {
-                                setStudentToDelete(student);
-                                setDeleteDialogOpen(true);
-                              }}
-                            >
-                              <Trash2 size={18} />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle className="flex items-center gap-2">
-                                <AlertTriangle className="h-5 w-5 text-red-500" />
-                                Delete Student
-                              </AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Are you sure you want to delete {student.first_name} {student.last_name}? This action cannot be undone and will remove all associated data including groups, fees, and attendance records.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-                                  e.preventDefault();
-                                  handleDeleteStudent();
-                                }}
-                                className="bg-red-500 hover:bg-red-600"
-                                disabled={isDeleting}
-                              >
-                                {isDeleting ? "Deleting..." : "Delete"}
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      )}
     </div>
   );
 } 

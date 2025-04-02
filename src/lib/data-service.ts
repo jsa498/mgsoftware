@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { DashboardStats, FeeAlert, RecentActivity, Student, Group, Quiz, QuizQuestion, QuizAttachment } from './types';
+import { DashboardStats, FeeAlert, RecentActivity, Student, Group, Quiz, QuizQuestion, QuizAttachment, Fee } from './types';
 
 /**
  * Fetches dashboard statistics
@@ -696,12 +696,12 @@ export async function clearGroupAttendance(groupId: string, month: Date): Promis
 }
 
 /**
- * Fetches practice leaderboard data
- * Returns students sorted by practice points in descending order
+ * Optimized function to fetch practice leaderboard data in a more efficient way
+ * Reduces multiple API calls to just a few batch operations
  */
-export async function getPracticeLeaderboard() {
+export async function getOptimizedPracticeLeaderboard() {
   try {
-    // Get all active students
+    // Get all active students in a single query
     const { data: students, error: studentsError } = await supabase
       .from('students')
       .select('id, first_name, last_name')
@@ -711,52 +711,63 @@ export async function getPracticeLeaderboard() {
     
     if (!students || students.length === 0) return [];
     
-    // For each student, get their practice sessions total time and points
-    const leaderboardData = await Promise.all(
-      students.map(async (student) => {
-        // Get total practice time and points
-        const { data: practiceData, error: practiceError } = await supabase
-          .from('practice_sessions')
-          .select('duration_minutes, points')
-          .eq('student_id', student.id)
-          .eq('status', 'completed');
+    // Extract all student IDs
+    const studentIds = students.map(student => student.id);
+    
+    // Get all practice sessions for these students in a single query
+    const { data: allPracticeSessions, error: sessionsError } = await supabase
+      .from('practice_sessions')
+      .select('student_id, duration_minutes, points')
+      .in('student_id', studentIds)
+      .eq('status', 'completed');
+    
+    if (sessionsError) throw sessionsError;
+    
+    // Create a map of student ID to their practice data
+    const practiceDataByStudent: Record<string, { totalMinutes: number, totalPoints: number }> = {};
+    
+    // Initialize with zeros for all students
+    studentIds.forEach(id => {
+      practiceDataByStudent[id] = { totalMinutes: 0, totalPoints: 0 };
+    });
+    
+    // Sum up durations and points for each student
+    if (allPracticeSessions) {
+      allPracticeSessions.forEach(session => {
+        const mins = typeof session.duration_minutes === 'number' 
+          ? session.duration_minutes 
+          : parseInt(session.duration_minutes) || 0;
         
-        if (practiceError) throw practiceError;
+        const pts = typeof session.points === 'number' 
+          ? session.points 
+          : parseFloat(session.points) || 0;
         
-        // Calculate total time and points
-        let totalMinutes = 0;
-        let totalPoints = 0;
-        
-        if (practiceData && practiceData.length > 0) {
-          totalMinutes = practiceData.reduce((sum, session) => {
-            // Make sure we're working with numbers
-            const mins = typeof session.duration_minutes === 'number' ? session.duration_minutes : parseInt(session.duration_minutes) || 0;
-            return sum + mins;
-          }, 0);
-          
-          totalPoints = practiceData.reduce((sum, session) => {
-            const pts = typeof session.points === 'number' ? session.points : parseFloat(session.points) || 0;
-            return sum + pts;
-          }, 0);
+        if (practiceDataByStudent[session.student_id]) {
+          practiceDataByStudent[session.student_id].totalMinutes += mins;
+          practiceDataByStudent[session.student_id].totalPoints += pts;
         }
-        
-        // Format time as hours and minutes
-        const hours = Math.floor(totalMinutes / 60);
-        const minutes = totalMinutes % 60;
-        // Format with clock-style notation (e.g. 1:30m)
-        const formattedTime = `${hours}:${minutes.toString().padStart(2, '0')}m`;
-        
-        return {
-          student_id: student.id,
-          name: `${student.first_name} ${student.last_name}`,
-          time: formattedTime,
-          points: totalPoints,
-          raw_minutes: totalMinutes, // Store raw minutes for sorting
-          hours, // Store raw hours for sorting
-          minutes: minutes // Store raw minutes for sorting
-        };
-      })
-    );
+      });
+    }
+    
+    // Create the leaderboard data
+    const leaderboardData = students.map(student => {
+      const { totalMinutes, totalPoints } = practiceDataByStudent[student.id] || { totalMinutes: 0, totalPoints: 0 };
+      
+      // Format time as hours and minutes
+      const hours = Math.floor(totalMinutes / 60);
+      const minutes = totalMinutes % 60;
+      const formattedTime = `${hours}:${minutes.toString().padStart(2, '0')}m`;
+      
+      return {
+        student_id: student.id,
+        name: `${student.first_name} ${student.last_name}`,
+        time: formattedTime,
+        points: totalPoints,
+        raw_minutes: totalMinutes,
+        hours,
+        minutes
+      };
+    });
     
     // Sort by points (descending)
     leaderboardData.sort((a, b) => {
@@ -774,18 +785,18 @@ export async function getPracticeLeaderboard() {
       points: parseFloat(data.points.toFixed(2)) // Format points to 2 decimal places
     }));
   } catch (error) {
-    console.error('Error fetching practice leaderboard:', error);
+    console.error('Error fetching optimized practice leaderboard:', error);
     return [];
   }
 }
 
 /**
- * Fetches quiz leaderboard data
- * Returns students sorted by quiz points in descending order
+ * Optimized function to fetch quiz leaderboard data in a more efficient way
+ * Reduces multiple API calls to just a few batch operations
  */
-export async function getQuizLeaderboard() {
+export async function getOptimizedQuizLeaderboard() {
   try {
-    // Get all active students
+    // Get all active students in a single query
     const { data: students, error: studentsError } = await supabase
       .from('students')
       .select('id, first_name, last_name')
@@ -795,32 +806,50 @@ export async function getQuizLeaderboard() {
     
     if (!students || students.length === 0) return [];
     
-    // For each student, get their quiz points
-    const leaderboardData = await Promise.all(
-      students.map(async (student) => {
-        // Get average quiz score
-        const { data: quizData, error: quizError } = await supabase
-          .from('quiz_results')
-          .select('score')
-          .eq('student_id', student.id);
-        
-        if (quizError) throw quizError;
-        
-        // Calculate average score
-        let points = 0;
-        
-        if (quizData && quizData.length > 0) {
-          const totalScore = quizData.reduce((sum, quiz) => sum + (quiz.score || 0), 0);
-          points = totalScore / quizData.length;
+    // Extract all student IDs
+    const studentIds = students.map(student => student.id);
+    
+    // Get all quiz results for these students in a single query
+    const { data: allQuizResults, error: quizError } = await supabase
+      .from('quiz_results')
+      .select('student_id, score')
+      .in('student_id', studentIds);
+    
+    if (quizError) throw quizError;
+    
+    // Group quiz results by student ID
+    const quizResultsByStudent: Record<string, number[]> = {};
+    
+    // Initialize empty arrays for all students
+    studentIds.forEach(id => {
+      quizResultsByStudent[id] = [];
+    });
+    
+    // Add scores to their respective students
+    if (allQuizResults) {
+      allQuizResults.forEach(result => {
+        if (quizResultsByStudent[result.student_id]) {
+          quizResultsByStudent[result.student_id].push(result.score || 0);
         }
-        
-        return {
-          student_id: student.id,
-          name: `${student.first_name} ${student.last_name}`,
-          points: points
-        };
-      })
-    );
+      });
+    }
+    
+    // Calculate average scores for each student
+    const leaderboardData = students.map(student => {
+      const scores = quizResultsByStudent[student.id] || [];
+      let points = 0;
+      
+      if (scores.length > 0) {
+        const totalScore = scores.reduce((sum, score) => sum + score, 0);
+        points = totalScore / scores.length;
+      }
+      
+      return {
+        student_id: student.id,
+        name: `${student.first_name} ${student.last_name}`,
+        points: points
+      };
+    });
     
     // Sort by points (descending)
     leaderboardData.sort((a, b) => b.points - a.points);
@@ -828,10 +857,11 @@ export async function getQuizLeaderboard() {
     // Add rank
     return leaderboardData.map((data, index) => ({
       ...data,
-      rank: index + 1
+      rank: index + 1,
+      points: parseFloat(data.points.toFixed(2)) // Format points to 2 decimal places
     }));
   } catch (error) {
-    console.error('Error fetching quiz leaderboard:', error);
+    console.error('Error fetching optimized quiz leaderboard:', error);
     return [];
   }
 }
@@ -1890,4 +1920,232 @@ export async function updateStudentGroups(studentId: string, groupIds: string[])
     console.error('Error updating student groups:', error);
     return false;
   }
+}
+
+/**
+ * Optimized function to fetch all students with their groups and fees in a single operation
+ * This replaces the need for multiple separate API calls
+ */
+export async function getStudentsWithDetails(): Promise<{
+  students: Student[];
+  studentGroups: Record<string, Group[]>;
+  studentFees: Record<string, Fee | null>;
+}> {
+  try {
+    // Get all students without pagination
+    const { data: students, error: studentsError } = await supabase
+      .from('students')
+      .select('*')
+      .order('first_name', { ascending: true });
+    
+    if (studentsError) throw studentsError;
+    
+    if (!students || students.length === 0) {
+      return { 
+        students: [], 
+        studentGroups: {}, 
+        studentFees: {}
+      };
+    }
+
+    // Extract all student IDs
+    const studentIds = students.map(student => student.id);
+    
+    // Fetch all student-group associations in a single query
+    const { data: studentGroupsJoins, error: groupsJoinError } = await supabase
+      .from('student_groups')
+      .select('student_id, group_id')
+      .in('student_id', studentIds);
+    
+    if (groupsJoinError) throw groupsJoinError;
+    
+    // Get unique group IDs
+    const groupIds = [...new Set(studentGroupsJoins?.map(sg => sg.group_id) || [])];
+    
+    // Fetch all groups data in a single query
+    let groups: Group[] = [];
+    if (groupIds.length > 0) {
+      const { data: groupsData, error: groupsError } = await supabase
+        .from('groups')
+        .select('*')
+        .in('id', groupIds);
+      
+      if (groupsError) throw groupsError;
+      groups = groupsData || [];
+    }
+    
+    // Build the student_id -> groups[] mapping
+    const studentGroupsMap: Record<string, Group[]> = {};
+    studentIds.forEach(id => {
+      studentGroupsMap[id] = [];
+    });
+    
+    // Populate the mapping
+    studentGroupsJoins?.forEach(join => {
+      const group = groups.find(g => g.id === join.group_id);
+      if (group && studentGroupsMap[join.student_id]) {
+        studentGroupsMap[join.student_id].push(group);
+      }
+    });
+    
+    // Fetch all fee information in a single query
+    const { data: feesData, error: feesError } = await supabase
+      .from('fees')
+      .select('*')
+      .in('student_id', studentIds)
+      .order('paid_until', { ascending: false });
+    
+    if (feesError) throw feesError;
+    
+    // Build the student_id -> fee mapping (taking the most recent fee record)
+    const studentFeesMap: Record<string, Fee | null> = {};
+    studentIds.forEach(id => {
+      studentFeesMap[id] = null;
+    });
+    
+    // Populate the fees mapping with the most recent fee for each student
+    feesData?.forEach(fee => {
+      // If this student doesn't have a fee record yet, or this is a newer record
+      if (!studentFeesMap[fee.student_id] || 
+          new Date(fee.paid_until) > new Date(studentFeesMap[fee.student_id]?.paid_until || '')) {
+        studentFeesMap[fee.student_id] = fee;
+      }
+    });
+    
+    return {
+      students: students,
+      studentGroups: studentGroupsMap,
+      studentFees: studentFeesMap
+    };
+  } catch (error) {
+    console.error('Error in getStudentsWithDetails:', error);
+    return { 
+      students: [], 
+      studentGroups: {}, 
+      studentFees: {}
+    };
+  }
+}
+
+/**
+ * Search students by name or contact across all pages
+ */
+export async function searchStudents(searchQuery: string): Promise<{
+  students: Student[];
+  studentGroups: Record<string, Group[]>;
+  studentFees: Record<string, Fee | null>;
+}> {
+  try {
+    // Get all students matching the search query
+    const { data: students, error: studentsError } = await supabase
+      .from('students')
+      .select('*')
+      .or(`first_name.ilike.%${searchQuery}%,last_name.ilike.%${searchQuery}%,phone.ilike.%${searchQuery}%`)
+      .order('first_name', { ascending: true });
+    
+    if (studentsError) throw studentsError;
+    
+    if (!students || students.length === 0) {
+      return { 
+        students: [], 
+        studentGroups: {}, 
+        studentFees: {} 
+      };
+    }
+
+    // Extract all student IDs
+    const studentIds = students.map(student => student.id);
+    
+    // Fetch all student-group associations in a single query
+    const { data: studentGroupsJoins, error: groupsJoinError } = await supabase
+      .from('student_groups')
+      .select('student_id, group_id')
+      .in('student_id', studentIds);
+    
+    if (groupsJoinError) throw groupsJoinError;
+    
+    // Get unique group IDs
+    const groupIds = [...new Set(studentGroupsJoins?.map(sg => sg.group_id) || [])];
+    
+    // Fetch all groups data in a single query
+    let groups: Group[] = [];
+    if (groupIds.length > 0) {
+      const { data: groupsData, error: groupsError } = await supabase
+        .from('groups')
+        .select('*')
+        .in('id', groupIds);
+      
+      if (groupsError) throw groupsError;
+      groups = groupsData || [];
+    }
+    
+    // Build the student_id -> groups[] mapping
+    const studentGroupsMap: Record<string, Group[]> = {};
+    studentIds.forEach(id => {
+      studentGroupsMap[id] = [];
+    });
+    
+    // Populate the mapping
+    studentGroupsJoins?.forEach(join => {
+      const group = groups.find(g => g.id === join.group_id);
+      if (group && studentGroupsMap[join.student_id]) {
+        studentGroupsMap[join.student_id].push(group);
+      }
+    });
+    
+    // Fetch all fee information in a single query
+    const { data: feesData, error: feesError } = await supabase
+      .from('fees')
+      .select('*')
+      .in('student_id', studentIds)
+      .order('paid_until', { ascending: false });
+    
+    if (feesError) throw feesError;
+    
+    // Build the student_id -> fee mapping (taking the most recent fee record)
+    const studentFeesMap: Record<string, Fee | null> = {};
+    studentIds.forEach(id => {
+      studentFeesMap[id] = null;
+    });
+    
+    // Populate the fees mapping with the most recent fee for each student
+    feesData?.forEach(fee => {
+      // If this student doesn't have a fee record yet, or this is a newer record
+      if (!studentFeesMap[fee.student_id] || 
+          new Date(fee.paid_until) > new Date(studentFeesMap[fee.student_id]?.paid_until || '')) {
+        studentFeesMap[fee.student_id] = fee;
+      }
+    });
+    
+    return {
+      students: students,
+      studentGroups: studentGroupsMap,
+      studentFees: studentFeesMap
+    };
+  } catch (error) {
+    console.error('Error in searchStudents:', error);
+    return { 
+      students: [], 
+      studentGroups: {}, 
+      studentFees: {} 
+    };
+  }
+}
+
+/**
+ * Fetches practice leaderboard data
+ * Returns students sorted by practice points in descending order
+ */
+export async function getPracticeLeaderboard() {
+  // Use the optimized version for better performance
+  return getOptimizedPracticeLeaderboard();
+}
+
+/**
+ * Fetches quiz leaderboard data
+ * Returns students sorted by quiz points in descending order
+ */
+export async function getQuizLeaderboard() {
+  // Use the optimized version for better performance
+  return getOptimizedQuizLeaderboard();
 } 
