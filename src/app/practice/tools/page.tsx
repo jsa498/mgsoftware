@@ -281,20 +281,19 @@ export default function PracticeToolsPage() {
         <div className="flex flex-col items-center space-y-8">
           {/* Practice Timer Display */}
           {isPlaying && (
-            <Card className="w-full">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-center">Practice Session</CardTitle>
-              </CardHeader>
-              <CardContent className="flex flex-col items-center space-y-4">
-                <div className="text-4xl font-bold">{formatTime(practiceTime)}</div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">Points:</span>
-                  <Badge variant="secondary" className="text-lg px-3 py-1">
-                    {practicePoints.toFixed(2)}
-                  </Badge>
-                </div>
-              </CardContent>
-            </Card>
+            <div className="inline-flex items-center gap-2 bg-card/80 border shadow-sm rounded-full px-4 py-1.5 mx-auto">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-muted-foreground">Session:</span>
+                <span className="text-base font-medium">{formatTime(practiceTime)}</span>
+              </div>
+              <div className="h-4 w-px bg-border/50"></div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-muted-foreground">Points:</span>
+                <span className="text-xs font-medium bg-muted px-2 py-0.5 rounded-full">
+                  {practicePoints.toFixed(2)}
+                </span>
+              </div>
+            </div>
           )}
           
           <Tooltip>
@@ -427,9 +426,9 @@ export default function PracticeToolsPage() {
           </div>
 
           {/* Instrument Selection */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full">
+          <div className="flex flex-row gap-2 overflow-x-auto pb-1 w-full sm:grid sm:grid-cols-3 sm:gap-3 md:gap-4">
             <Select defaultValue="sarangi">
-              <SelectTrigger className="rounded-lg">
+              <SelectTrigger className="rounded-lg min-w-[120px] sm:min-w-0">
                 <SelectValue placeholder="Sarangi" />
               </SelectTrigger>
               <SelectContent>
@@ -440,7 +439,7 @@ export default function PracticeToolsPage() {
             </Select>
 
             <Select defaultValue="roopak">
-              <SelectTrigger className="rounded-lg">
+              <SelectTrigger className="rounded-lg min-w-[120px] sm:min-w-0">
                 <SelectValue placeholder="Roopak (7)" />
               </SelectTrigger>
               <SelectContent>
@@ -451,7 +450,7 @@ export default function PracticeToolsPage() {
             </Select>
 
             <Select defaultValue="charukeshi">
-              <SelectTrigger className="rounded-lg">
+              <SelectTrigger className="rounded-lg min-w-[120px] sm:min-w-0">
                 <SelectValue placeholder="Charukeshi" />
               </SelectTrigger>
               <SelectContent>
