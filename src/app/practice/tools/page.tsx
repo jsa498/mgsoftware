@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import { PlayIcon, PauseIcon, MinusIcon, PlusIcon, ChevronLeftIcon, ChevronRightIcon, VolumeIcon, CameraIcon } from "lucide-react"
+import { PlayIcon, PauseIcon, MinusIcon, PlusIcon, ChevronLeftIcon, ChevronRightIcon, VolumeIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
 import {
@@ -37,7 +37,7 @@ import { startPracticeSession, updatePracticeSession, completePracticeSession, g
 import { useToast } from "@/components/ui/use-toast"
 import { getCurrentUser } from "@/lib/auth"
 import { getStudentProfileByUserId } from "@/lib/data-service"
-import { useRef as useReactRef } from "react"
+import { InstrumentVerificationDialog } from "@/components/InstrumentVerificationDialog"
 
 const notes = ["A", "A#", "B", "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#"]
 
@@ -45,7 +45,6 @@ export default function PracticeToolsPage() {
   const [bpm, setBpm] = useState(100)
   const [currentNote, setCurrentNote] = useState("A")
   const [isPlaying, setIsPlaying] = useState(false)
-  const [isAudioPlaying, setIsAudioPlaying] = useState(false)
   const [volumes, setVolumes] = useState({
     lehra: 50,
     tanpura: 50,
@@ -57,31 +56,19 @@ export default function PracticeToolsPage() {
   const [practicePoints, setPracticePoints] = useState(0)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [practiceCompleted, setPracticeCompleted] = useState(false)
-  const [isStartingPractice, setIsStartingPractice] = useState(false) // New flag to prevent multiple starts
   const [completionData, setCompletionData] = useState<{
     duration: string;
     points: string;
     durationMinutes: number;
   } | null>(null)
   
-  // Camera verification state
-  const [showCameraDialog, setShowCameraDialog] = useState(false)
-  const [cameraVerified, setCameraVerified] = useState(false)
-  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null)
-  const [cameraError, setCameraError] = useState<string | null>(null)
-  const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const [analyzingProgress, setAnalyzingProgress] = useState(0)
-  
-  const videoRef = useRef<HTMLVideoElement>(null)
+  // Instrument verification state
+  const [verificationOpen, setVerificationOpen] = useState(false)
   
   // Timer ref to store interval ID
   const timerRef = useRef<NodeJS.Timeout | null>(null)
-  const analyzeTimerRef = useRef<NodeJS.Timeout | null>(null)
   
   const { toast } = useToast()
-  
-  // Ref to track if we've already shown a practice started toast
-  const practiceStartedToastShown = useReactRef<boolean>(false)
   
   // Format practice time as HH:MM:SS
   const formatTime = (timeInSeconds: number) => {
@@ -148,9 +135,6 @@ export default function PracticeToolsPage() {
               setPracticePoints(calculatePoints(elapsedSeconds))
               setIsPlaying(true)
               startTimer()
-              
-              // Mark that we've already shown a toast for this session
-              practiceStartedToastShown.current = true
             }
           }
         }
@@ -172,13 +156,6 @@ export default function PracticeToolsPage() {
   // Start practice session
   const handleStartPractice = async () => {
     try {
-      // Prevent multiple simultaneous start requests
-      if (isStartingPractice || isPlaying || sessionId) {
-        return
-      }
-      
-      setIsStartingPractice(true)
-      
       const user = await getCurrentUser()
       if (!user || user.role !== 'student') {
         toast({
@@ -186,7 +163,6 @@ export default function PracticeToolsPage() {
           description: "You must be logged in as a student to practice.",
           variant: "destructive",
         })
-        setIsStartingPractice(false)
         return
       }
       
@@ -198,44 +174,22 @@ export default function PracticeToolsPage() {
           description: "Could not find your student profile. Please contact support.",
           variant: "destructive",
         })
-        setIsStartingPractice(false)
         return
       }
       
-      // Check for any existing active session to prevent duplicates
-      const existingSession = await getActivePracticeSession(studentProfile.id as string)
-      if (existingSession) {
-        // If there's already an active session, use that instead of creating a new one
-        setSessionId(existingSession.id as string)
-        const startedAt = new Date(existingSession.started_at as string)
-        const now = new Date()
-        const elapsedSeconds = Math.floor((now.getTime() - startedAt.getTime()) / 1000)
-        setPracticeTime(elapsedSeconds)
-        setPracticePoints(calculatePoints(elapsedSeconds))
+      const id = await startPracticeSession(studentProfile.id as string)
+      if (id) {
+        setSessionId(id)
+        setPracticeTime(0)
+        setPracticePoints(0)
         setIsPlaying(true)
         startTimer()
-      } else {
-        // Only create a new session if one doesn't exist
-        const id = await startPracticeSession(studentProfile.id as string)
-        if (id) {
-          setSessionId(id)
-          setPracticeTime(0)
-          setPracticePoints(0)
-          setIsPlaying(true)
-          startTimer()
-        }
-      }
-      
-      // Only show the toast if we haven't shown it already
-      if (!practiceStartedToastShown.current) {
+        
         toast({
           title: "Practice Started",
           description: "Your practice session has started. The timer is now running.",
         })
-        practiceStartedToastShown.current = true
       }
-      
-      setIsStartingPractice(false)
     } catch (error) {
       console.error('Error starting practice:', error)
       toast({
@@ -243,7 +197,6 @@ export default function PracticeToolsPage() {
         description: "Failed to start practice. Please try again.",
         variant: "destructive",
       })
-      setIsStartingPractice(false)
     }
   }
   
@@ -267,9 +220,6 @@ export default function PracticeToolsPage() {
         })
         setPracticeCompleted(true)
         setSessionId(null)
-        
-        // Reset the toast flag when practice is stopped
-        practiceStartedToastShown.current = false
       }
     } catch (error) {
       console.error('Error stopping practice:', error)
@@ -285,20 +235,8 @@ export default function PracticeToolsPage() {
   const handleCloseCompletion = () => {
     setPracticeCompleted(false)
     setCompletionData(null)
-    // Don't reset these values here as they might cause a new session to start
-    // setPracticeTime(0)
-    // setPracticePoints(0)
-    
-    // Ensure proper state is set to prevent auto-starting
-    setIsPlaying(false)
-    setSessionId(null)
-    setIsStartingPractice(false)
-    
-    // Reset practice time and points after a brief delay to prevent race conditions
-    setTimeout(() => {
-      setPracticeTime(0)
-      setPracticePoints(0)
-    }, 500)
+    setPracticeTime(0)
+    setPracticePoints(0)
   }
 
   // Function to handle volume change
@@ -334,126 +272,31 @@ export default function PracticeToolsPage() {
 
   // Function to toggle play/pause
   const togglePlay = () => {
-    // Don't allow toggling if completion dialog is showing or if we're in a transition state
-    if (practiceCompleted || isStartingPractice) {
-      return;
-    }
-    
     if (isPlaying) {
       handleStopPractice()
     } else {
-      // Show camera verification dialog first
-      setShowCameraDialog(true)
+      // Show verification dialog instead of starting practice immediately
+      setVerificationOpen(true)
     }
   }
 
-  // Function to toggle audio playback independent of practice session
-  const toggleAudioPlayback = () => {
-    setIsAudioPlaying(!isAudioPlaying)
-    // Here you would implement the actual audio playback logic
-    // This could control the metronome, tanpura, etc. without affecting the practice session
+  // Handle continue after verification
+  const handleContinueAfterVerification = () => {
+    setVerificationOpen(false)
+    handleStartPractice()
   }
-
-  // Function to handle camera verification
-  const handleCameraVerification = () => {
-    if (isAnalyzing || isStartingPractice) return
-    
-    setIsAnalyzing(true)
-    setAnalyzingProgress(0)
-    
-    // Simulate AI analysis with progress
-    analyzeTimerRef.current = setInterval(() => {
-      setAnalyzingProgress(prev => {
-        const newProgress = prev + 10
-        
-        if (newProgress >= 100) {
-          clearInterval(analyzeTimerRef.current!)
-          setTimeout(() => {
-            setCameraVerified(true)
-            setShowCameraDialog(false)
-            stopCamera()
-            
-            // Prevent multiple calls to handleStartPractice
-            // Only start if not already playing and no session exists
-            if (!isPlaying && !sessionId && !isStartingPractice) {
-              // Use setTimeout to ensure dialog state is fully updated
-              setTimeout(() => {
-                handleStartPractice()
-              }, 100)
-            }
-          }, 500)
-        }
-        
-        return newProgress
-      })
-    }, 200)
-  }
-
-  // Function to start camera
-  const startCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: "environment" } 
-      })
-      
-      setCameraStream(stream)
-      setCameraError(null)
-      
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-      }
-    } catch (error) {
-      console.error("Error accessing camera:", error)
-      setCameraError("Could not access camera. Please ensure you've granted permission.")
-    }
-  }
-  
-  // Function to stop camera
-  const stopCamera = () => {
-    if (cameraStream) {
-      cameraStream.getTracks().forEach(track => track.stop())
-      setCameraStream(null)
-    }
-    
-    if (analyzeTimerRef.current) {
-      clearInterval(analyzeTimerRef.current)
-      analyzeTimerRef.current = null
-    }
-    
-    setIsAnalyzing(false)
-    setAnalyzingProgress(0)
-  }
-
-  // Function to cancel camera verification
-  const handleCancelVerification = () => {
-    stopCamera()
-    setShowCameraDialog(false)
-  }
-  
-  // Start camera when dialog opens
-  useEffect(() => {
-    if (showCameraDialog) {
-      startCamera()
-    } else {
-      stopCamera()
-    }
-    
-    return () => {
-      stopCamera()
-    }
-  }, [showCameraDialog])
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      stopCamera()
-    }
-  }, [])
 
   return (
     <TooltipProvider>
       <div className="container mx-auto px-4 py-8 max-w-3xl">
         <div className="flex flex-col items-center space-y-8">
+          {/* Instrument Verification Dialog */}
+          <InstrumentVerificationDialog
+            open={verificationOpen}
+            onOpenChange={setVerificationOpen}
+            onContinue={handleContinueAfterVerification}
+          />
+
           {/* Practice Timer Display */}
           {isPlaying && (
             <div className="inline-flex items-center gap-2 bg-card/80 border shadow-sm rounded-full px-4 py-1.5 mx-auto">
@@ -711,138 +554,27 @@ export default function PracticeToolsPage() {
             </Card>
           </div>
 
-          {/* Play Button - Independent audio control */}
+          {/* Play Button */}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button 
-                variant={isAudioPlaying ? "secondary" : "default"}
+                variant={isPlaying ? "secondary" : "default"}
                 size="icon" 
                 className="rounded-full h-16 w-16 mt-4"
-                onClick={toggleAudioPlayback}
+                onClick={togglePlay}
               >
-                {isAudioPlaying ? <PauseIcon className="h-8 w-8" /> : <PlayIcon className="h-8 w-8" />}
+                {isPlaying ? <PauseIcon className="h-8 w-8" /> : <PlayIcon className="h-8 w-8" />}
               </Button>
             </TooltipTrigger>
             <TooltipContent>
-              <p>{isAudioPlaying ? "Stop audio" : "Play audio"}</p>
+              <p>{isPlaying ? "Pause" : "Play"}</p>
             </TooltipContent>
           </Tooltip>
         </div>
       </div>
       
-      {/* Camera Verification Dialog */}
-      <Dialog open={showCameraDialog} onOpenChange={(open) => {
-        if (!open) {
-          stopCamera()
-          setShowCameraDialog(open)
-        } else {
-          setShowCameraDialog(open)
-        }
-      }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Instrument Verification</DialogTitle>
-            <DialogDescription>
-              Please take a picture of your instrument for our AI analysis. 
-              This helps us verify you have your instrument ready for practice.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="flex flex-col items-center justify-center space-y-4 py-4">
-            <div className="bg-muted rounded-lg p-2 w-full flex flex-col items-center justify-center overflow-hidden">
-              {cameraError ? (
-                <div className="p-4 text-center">
-                  <p className="text-destructive mb-2">{cameraError}</p>
-                  <Button 
-                    variant="outline"
-                    size="sm"
-                    onClick={() => startCamera()}
-                  >
-                    Try Again
-                  </Button>
-                </div>
-              ) : (
-                <>
-                  <div className="relative w-full aspect-video rounded overflow-hidden bg-black">
-                    <video 
-                      ref={videoRef} 
-                      autoPlay 
-                      playsInline
-                      muted
-                      className="w-full h-full object-cover"
-                    ></video>
-                    
-                    {isAnalyzing && (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70">
-                        <div className="text-white text-sm mb-2">
-                          {analyzingProgress < 100 ? 'Analyzing instrument...' : 'Instrument verified'}
-                        </div>
-                        <div className="w-3/4 max-w-64">
-                          <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
-                            <div 
-                              className="h-full bg-primary transition-all duration-200" 
-                              style={{ width: `${analyzingProgress}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  
-                  <Button
-                    variant="default"
-                    size="sm"
-                    className="mt-3"
-                    onClick={handleCameraVerification}
-                    disabled={isAnalyzing || !cameraStream}
-                  >
-                    {isAnalyzing ? 'Analyzing...' : 'Take a Photo'}
-                  </Button>
-                </>
-              )}
-            </div>
-            
-            <div className="text-sm text-muted-foreground text-center max-w-sm">
-              <p className="font-medium">Don&apos;t worry!</p>
-              <p>These images are only used to verify you&apos;re practicing with your instrument. 
-              They are not stored - your privacy matters to us.</p>
-            </div>
-          </div>
-          
-          <DialogFooter className="flex flex-row justify-between sm:justify-between">
-            <Button
-              variant="ghost"
-              onClick={handleCancelVerification}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              onClick={() => {
-                if (!isAnalyzing) {
-                  handleCameraVerification()
-                }
-              }}
-              disabled={isAnalyzing || !cameraStream}
-            >
-              {isAnalyzing ? 'Analyzing...' : 'Continue to Practice'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      
       {/* Practice Completion Dialog */}
-      <Dialog 
-        open={practiceCompleted} 
-        onOpenChange={(open) => {
-          // Only handle closing the dialog via our handler to ensure proper state management
-          if (!open && practiceCompleted) {
-            handleCloseCompletion()
-          } else {
-            setPracticeCompleted(open)
-          }
-        }}
-      >
+      <Dialog open={practiceCompleted} onOpenChange={setPracticeCompleted}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Practice Session Completed</DialogTitle>
