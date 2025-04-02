@@ -45,6 +45,7 @@ export default function PracticeToolsPage() {
   const [bpm, setBpm] = useState(100)
   const [currentNote, setCurrentNote] = useState("A")
   const [isPlaying, setIsPlaying] = useState(false)
+  const [isAudioPlaying, setIsAudioPlaying] = useState(false)
   const [volumes, setVolumes] = useState({
     lehra: 50,
     tanpura: 50,
@@ -278,6 +279,15 @@ export default function PracticeToolsPage() {
       // Show verification dialog instead of starting practice immediately
       setVerificationOpen(true)
     }
+  }
+
+  // Function to handle the bottom play button separately from practice session
+  const handleBottomPlayButton = () => {
+    // This will just play/pause the audio without affecting the practice session
+    console.log("Bottom play button clicked - independent from practice session")
+    // Toggle audio playback state
+    setIsAudioPlaying(!isAudioPlaying)
+    // Add actual audio playback logic here
   }
 
   // Handle continue after verification
@@ -558,16 +568,16 @@ export default function PracticeToolsPage() {
           <Tooltip>
             <TooltipTrigger asChild>
               <Button 
-                variant={isPlaying ? "secondary" : "default"}
+                variant={isAudioPlaying ? "secondary" : "default"}
                 size="icon" 
                 className="rounded-full h-16 w-16 mt-4"
-                onClick={togglePlay}
+                onClick={handleBottomPlayButton}
               >
-                {isPlaying ? <PauseIcon className="h-8 w-8" /> : <PlayIcon className="h-8 w-8" />}
+                {isAudioPlaying ? <PauseIcon className="h-8 w-8" /> : <PlayIcon className="h-8 w-8" />}
               </Button>
             </TooltipTrigger>
             <TooltipContent>
-              <p>{isPlaying ? "Pause" : "Play"}</p>
+              <p>{isAudioPlaying ? "Pause Audio" : "Play Audio"}</p>
             </TooltipContent>
           </Tooltip>
         </div>
