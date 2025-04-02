@@ -63,6 +63,10 @@ export default function PracticeToolsPage() {
     durationMinutes: number;
   } | null>(null)
   
+  // Track session start time for accurate timing even when tab is not active
+  const sessionStartTimeRef = useRef<Date | null>(null)
+  const lastUpdateTimeRef = useRef<Date | null>(null)
+  
   // Instrument verification state
   const [verificationOpen, setVerificationOpen] = useState(false)
   
@@ -91,14 +95,25 @@ export default function PracticeToolsPage() {
       clearInterval(timerRef.current)
     }
     
+    // Store the current time as last update time
+    lastUpdateTimeRef.current = new Date()
+    
     timerRef.current = setInterval(() => {
+      // Calculate elapsed time since last update
+      const now = new Date()
+      const elapsed = lastUpdateTimeRef.current 
+        ? Math.floor((now.getTime() - lastUpdateTimeRef.current.getTime()) / 1000)
+        : 1 // Default to 1 second if no last update time
+      
+      lastUpdateTimeRef.current = now
+      
       setPracticeTime(prev => {
-        const newTime = prev + 1
+        const newTime = prev + elapsed
         // Update points (2 points per hour)
         setPracticePoints(calculatePoints(newTime))
         
         // Update session in database every minute
-        if (newTime % 60 === 0 && sessionId) {
+        if (Math.floor(newTime / 60) > Math.floor(prev / 60) && sessionId) {
           updatePracticeSession(sessionId, Math.floor(newTime / 60))
             .catch(err => console.error('Error updating session:', err))
         }
@@ -130,6 +145,7 @@ export default function PracticeToolsPage() {
               setSessionId(session.id as string)
               // Calculate elapsed time from started_at to now
               const startedAt = new Date(session.started_at as string)
+              sessionStartTimeRef.current = startedAt
               const now = new Date()
               const elapsedSeconds = Math.floor((now.getTime() - startedAt.getTime()) / 1000)
               setPracticeTime(elapsedSeconds)
@@ -153,6 +169,45 @@ export default function PracticeToolsPage() {
       }
     }
   }, [startTimer, calculatePoints])
+  
+  // Handle visibility changes
+  useEffect(() => {
+    if (!isPlaying) return
+    
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        // Tab is visible again, update the timer
+        if (sessionId && lastUpdateTimeRef.current) {
+          const now = new Date()
+          const elapsed = Math.floor((now.getTime() - lastUpdateTimeRef.current.getTime()) / 1000)
+          
+          // Only update if significant time has passed (more than 2 seconds)
+          if (elapsed > 2) {
+            setPracticeTime(prev => {
+              const newTime = prev + elapsed
+              setPracticePoints(calculatePoints(newTime))
+              
+              // Update session in database if minutes changed
+              if (Math.floor(newTime / 60) > Math.floor(prev / 60)) {
+                updatePracticeSession(sessionId, Math.floor(newTime / 60))
+                  .catch(err => console.error('Error updating session:', err))
+              }
+              
+              return newTime
+            })
+          }
+          
+          lastUpdateTimeRef.current = now
+        }
+      }
+    }
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [isPlaying, sessionId, calculatePoints])
   
   // Start practice session
   const handleStartPractice = async () => {
@@ -184,6 +239,8 @@ export default function PracticeToolsPage() {
         setPracticeTime(0)
         setPracticePoints(0)
         setIsPlaying(true)
+        sessionStartTimeRef.current = new Date()
+        lastUpdateTimeRef.current = new Date()
         startTimer()
         
         toast({
