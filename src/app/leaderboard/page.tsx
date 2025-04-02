@@ -22,7 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { getPracticeLeaderboard, getQuizLeaderboard, updateQuizPoints } from "@/lib/data-service";
+import { getPracticeLeaderboard, getQuizLeaderboard, updateQuizPoints, getActivePracticingSessions } from "@/lib/data-service";
 import { toast } from "@/components/ui/use-toast";
 import { isAdmin } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
@@ -63,13 +63,38 @@ export default function Leaderboard() {
   const [timeAction, setTimeAction] = useState<"add" | "deduct">("add");
   const [timeHours, setTimeHours] = useState<string>("0");
   const [timeMinutes, setTimeMinutes] = useState<string>("15");
+  const [activePracticingSessions, setActivePracticingSessions] = useState<string[]>([]);
   
   // Fetch leaderboard data on component mount
   useEffect(() => {
     fetchLeaderboardData();
     // Check if the current user is an admin
     setIsUserAdmin(isAdmin());
+    
+    // Set up polling for active practice sessions if user is admin
+    if (isAdmin()) {
+      fetchActivePracticingSessions();
+      
+      // Poll for active practice sessions every 10 seconds
+      const intervalId = setInterval(() => {
+        fetchActivePracticingSessions();
+      }, 10000);
+      
+      return () => clearInterval(intervalId);
+    }
   }, []);
+  
+  // Function to fetch active practicing sessions
+  const fetchActivePracticingSessions = async () => {
+    if (!isAdmin()) return;
+    
+    try {
+      const activeSessions = await getActivePracticingSessions();
+      setActivePracticingSessions(activeSessions);
+    } catch (error) {
+      console.error("Error fetching active practice sessions:", error);
+    }
+  };
   
   // Function to fetch leaderboard data
   const fetchLeaderboardData = async () => {
@@ -80,6 +105,11 @@ export default function Leaderboard() {
       
       setPracticeData(practiceLeaderboard);
       setQuizData(quizLeaderboard);
+      
+      // Also update active practice sessions
+      if (isAdmin()) {
+        fetchActivePracticingSessions();
+      }
     } catch (error) {
       console.error("Error fetching leaderboard data:", error);
       toast({
@@ -320,7 +350,15 @@ export default function Leaderboard() {
                           <div className="ml-3">#{student.rank}</div>
                         )}
                       </TableCell>
-                      <TableCell>{student.name}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {isUserAdmin && activePracticingSessions.includes(student.student_id) && (
+                            <div className="h-2.5 w-2.5 rounded-full bg-green-500 animate-pulse" 
+                                 title="Currently practicing" />
+                          )}
+                          {student.name}
+                        </div>
+                      </TableCell>
                       <TableCell>{student.time}</TableCell>
                       <TableCell>
                         <Badge variant="secondary" className="font-medium">

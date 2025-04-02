@@ -2148,4 +2148,25 @@ export async function getPracticeLeaderboard() {
 export async function getQuizLeaderboard() {
   // Use the optimized version for better performance
   return getOptimizedQuizLeaderboard();
+}
+
+/**
+ * Gets all students with active practice sessions
+ */
+export async function getActivePracticingSessions(): Promise<string[]> {
+  try {
+    // Join practice_sessions with students to get student data along with active sessions
+    const { data, error } = await supabase
+      .from('practice_sessions')
+      .select('student_id')
+      .eq('status', 'started');
+    
+    if (error) throw error;
+    
+    // Extract student IDs from active sessions
+    return data?.map(session => session.student_id) || [];
+  } catch (error) {
+    console.error('Error fetching active practicing sessions:', error);
+    return [];
+  }
 } 
