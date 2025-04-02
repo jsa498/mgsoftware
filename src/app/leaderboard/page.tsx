@@ -7,7 +7,6 @@ import {
   RefreshCw,
   Plus,
   Minus,
-  MoreVertical,
   BarChart2,
   RotateCcw,
   Clock,
@@ -35,13 +34,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { supabase } from "@/lib/supabase";
 
 // Define types for our leaderboard data
@@ -69,7 +61,6 @@ export default function Leaderboard() {
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
   const [timeDialogOpen, setTimeDialogOpen] = useState(false);
   const [timeAction, setTimeAction] = useState<"add" | "deduct">("add");
-  const [timeAmount, setTimeAmount] = useState<string>("15");
   const [timeHours, setTimeHours] = useState<string>("0");
   const [timeMinutes, setTimeMinutes] = useState<string>("15");
   
@@ -157,29 +148,16 @@ export default function Leaderboard() {
         throw new Error("Student not found");
       }
       
-      const student = practiceData[studentIndex];
-      const currentTime = student.time;
-      
-      // Parse current time (format: "2h 54m")
-      const hourMatch = currentTime.match(/(\d+)h/);
-      const minuteMatch = currentTime.match(/(\d+)m/);
-      
-      const hours = hourMatch ? parseInt(hourMatch[1]) : 0;
-      const minutes = minuteMatch ? parseInt(minuteMatch[1]) : 0;
-      
-      // Calculate total minutes being added/deducted
-      let minuteDelta = minutesToAdd;
-      
       // Calculate points (2 points per hour)
-      const pointsDelta = (minuteDelta / 60) * 2;
+      const pointsDelta = (minutesToAdd / 60) * 2;
       
       // Instead of updating an existing session, create a new adjustment session
       // This ensures the leaderboard aggregation works correctly
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('practice_sessions')
         .insert({
           student_id: studentId,
-          duration_minutes: minuteDelta,
+          duration_minutes: minutesToAdd,
           points: pointsDelta.toFixed(2),
           status: 'completed',
           started_at: new Date().toISOString(),
