@@ -1385,49 +1385,45 @@ export async function updateStudentProfile(studentId: string, data: { phone?: st
   }
 }
 
-// Update student profile image
-export async function updateProfileImage(studentId: string, file: File): Promise<string | null> {
+/**
+ * Updates the profile image for the currently authenticated student.
+ * Uses the server-side API endpoint to handle the upload securely.
+ */
+export async function updateProfileImage(file: File): Promise<string | null> {
   try {
-    // Upload the file to Supabase storage
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${studentId}-profile-${Date.now()}.${fileExt}`;
-    const filePath = `profile-images/${fileName}`;
-
-    const { error } = await supabase
-      .storage
-      .from('student-profiles')
-      .upload(filePath, file);
-
-    if (error) {
-      console.error('Error uploading profile image:', error);
-      return null;
+    // Create form data to send to API
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    // Send to our server-side API endpoint
+    // The server will determine the student ID based on the session/cookie
+    const response = await fetch('/api/profile-image', {
+      method: 'POST',
+      body: formData,
+    });
+    
+    if (!response.ok) {
+      let errorData = { error: 'Unknown error during upload' };
+      try {
+        errorData = await response.json();
+      } catch (parseError) {
+        console.error('Failed to parse error response:', parseError);
+      }
+      console.error('Error uploading profile image via API:', response.status, errorData);
+      throw new Error(errorData.error || 'Failed to upload profile image');
+    }
+    
+    const data = await response.json();
+    if (!data.success || !data.imageUrl) {
+        console.error('API response missing success flag or imageUrl:', data);
+        throw new Error('Invalid response from image upload API');
     }
 
-    // Get the public URL
-    const { data: publicUrlData } = supabase
-      .storage
-      .from('student-profiles')
-      .getPublicUrl(filePath);
-
-    if (!publicUrlData.publicUrl) {
-      console.error('Failed to get public URL for uploaded image');
-      return null;
-    }
-
-    // Update the student record with the new image URL
-    const { error: updateError } = await supabase
-      .from('students')
-      .update({ profile_image_url: publicUrlData.publicUrl })
-      .eq('id', studentId);
-
-    if (updateError) {
-      console.error('Error updating student profile with image URL:', updateError);
-      return null;
-    }
-
-    return publicUrlData.publicUrl;
+    console.log('Profile image updated successfully:', data.imageUrl);
+    return data.imageUrl;
   } catch (error) {
-    console.error('Error updating profile image:', error);
+    console.error('Client-side error in updateProfileImage:', error);
+    // Return null as per the original function signature to indicate failure
     return null;
   }
 }

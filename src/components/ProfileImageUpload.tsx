@@ -99,7 +99,7 @@ export function ProfileImageUpload({ imageUrl, fullName, onImageSelect }: Profil
           <DialogHeader>
             <DialogTitle>Update Profile Picture</DialogTitle>
             <DialogDescription>
-              Upload a new profile picture. Click save when you're done.
+              Upload a new profile picture. Click save when you&apos;re done.
             </DialogDescription>
           </DialogHeader>
           

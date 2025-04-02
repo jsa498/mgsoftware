@@ -7,7 +7,6 @@ import { getStudentProfileByUserId, updateStudentProfile, updateProfileImage } f
 
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -15,7 +14,7 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { toast } from "@/components/ui/use-toast"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Phone, User, UserCircle2, UsersRound } from "lucide-react"
+import { Phone, User, UsersRound } from "lucide-react"
 import { ProfileImageUpload } from "@/components/ProfileImageUpload"
 
 export default function ProfilePage() {
@@ -34,7 +33,6 @@ export default function ProfilePage() {
     }>;
   } | null>(null)
   const [phone, setPhone] = useState("")
-  const [profileImage, setProfileImage] = useState<File | null>(null)
   const [photoUrl, setPhotoUrl] = useState<string | null>(null)
 
   // Get student profile data
@@ -127,7 +125,7 @@ export default function ProfilePage() {
     if (file && profile) {
       try {
         setSaving(true)
-        const newImageUrl = await updateProfileImage(profile.id, file)
+        const newImageUrl = await updateProfileImage(file)
         
         if (newImageUrl) {
           setPhotoUrl(newImageUrl)
