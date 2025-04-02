@@ -167,7 +167,7 @@ export function Sidebar({ className, ...props }: SidebarProps) {
     },
     {
       name: "Requests",
-      href: "/requests",
+      href: "/student-requests",
       icon: ClipboardList,
     },
     {

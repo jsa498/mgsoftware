@@ -1,52 +1,225 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { LockKeyhole, RefreshCcw, BookOpen, FileEdit, Bug } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
+import { createClient } from "@supabase/supabase-js"
+import { Badge } from "@/components/ui/badge"
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogDescription,
+  DialogFooter
+} from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Label } from "@/components/ui/label"
 
 // Types
-interface Request {
+interface Student {
   id: string
-  studentId: string
+  first_name: string
+  last_name: string
+}
+
+interface FeatureRequest {
+  id: string
+  student_id: string
+  type: 'feature' | 'bug'
+  title: string
+  description: string
+  status: 'pending' | 'in_development' | 'completed' | 'rejected'
+  created_at: string
+  updated_at: string
+  students?: Student
+}
+
+interface PinRequest {
+  id: string
+  student_id: string
   studentName: string
-  requestType: 'pin' | 'quiz' | 'practice' | 'general'
+  requestType: 'pin'
   title: string
   details: string
   status: 'pending' | 'approved' | 'rejected'
-  timestamp: Date
 }
 
-// Mock data
-const mockRequests: Request[] = [
-  /* Empty for now - will show the "no pending requests" state */
-]
+interface QuizRequest {
+  id: string
+  student_id: string
+  studentName: string
+  requestType: 'quiz'
+  title: string
+  details: string
+  status: 'pending' | 'approved' | 'rejected'
+}
+
+interface PracticeRequest {
+  id: string
+  student_id: string
+  studentName: string
+  requestType: 'practice'
+  title: string
+  details: string
+  status: 'pending' | 'approved' | 'rejected'
+}
+
+type Request = FeatureRequest | PinRequest | QuizRequest | PracticeRequest;
 
 export default function RequestsPage() {
-  const [isLoading, setIsLoading] = useState(false)
-  const [requests] = useState<Request[]>(mockRequests)
-
+  const [isLoading, setIsLoading] = useState(true)
+  const [requests, setRequests] = useState<Request[]>([])
+  const [selectedRequest, setSelectedRequest] = useState<FeatureRequest | null>(null)
+  const [openDialog, setOpenDialog] = useState(false)
+  const [newStatus, setNewStatus] = useState<string>('')
+  
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+  )
+  
   // Filter requests by type
-  const pinChangeRequests = requests.filter(req => req.requestType === 'pin')
-  const quizRetryRequests = requests.filter(req => req.requestType === 'quiz')
-  const practiceRetryRequests = requests.filter(req => req.requestType === 'practice')
-  const featureAndBugRequests = requests.filter(req => req.requestType === 'general')
+  const pinChangeRequests = requests.filter(req => 'requestType' in req && req.requestType === 'pin') as PinRequest[]
+  const quizRetryRequests = requests.filter(req => 'requestType' in req && req.requestType === 'quiz') as QuizRequest[]
+  const practiceRetryRequests = requests.filter(req => 'requestType' in req && req.requestType === 'practice') as PracticeRequest[]
+  const featureAndBugRequests = requests.filter(req => 'type' in req) as FeatureRequest[]
 
-  // Refresh requests from server (simulated)
-  const refreshRequests = () => {
+  // Fetch requests from server
+  const fetchRequests = async () => {
     setIsLoading(true)
     
-    // Simulate API call
-    setTimeout(() => {
-      // For demo purposes, we'll just keep the same empty state
-      setIsLoading(false)
-    }, 1500)
+    try {
+      const { data, error } = await supabase
+        .from('feature_requests')
+        .select(`
+          *,
+          students:student_id (
+            id,
+            first_name,
+            last_name
+          )
+        `)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      
+      setRequests(data || []);
+    } catch (error) {
+      console.error('Error fetching feature requests:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+  
+  // Update a request status
+  const updateRequestStatus = async () => {
+    if (!selectedRequest || !newStatus) return;
+    
+    try {
+      const { error } = await supabase
+        .from('feature_requests')
+        .update({ 
+          status: newStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', selectedRequest.id);
+      
+      if (error) throw error;
+      
+      setOpenDialog(false);
+      fetchRequests(); // Refresh the list
+    } catch (error) {
+      console.error('Error updating request status:', error);
+    }
+  }
+  
+  // Load requests on component mount
+  useEffect(() => {
+    fetchRequests();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Open the status update dialog
+  const openStatusDialog = (request: FeatureRequest) => {
+    setSelectedRequest(request);
+    setNewStatus(request.status);
+    setOpenDialog(true);
   }
 
-  // Render request card or empty state
-  const renderRequestsOrEmpty = (requests: Request[], emptyMessage: string) => {
+  // Render feature requests or empty state
+  const renderFeatureRequests = () => {
+    if (isLoading) {
+      return (
+        <div className="space-y-3">
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-12 w-full" />
+        </div>
+      )
+    }
+    
+    if (featureAndBugRequests.length === 0) {
+      return (
+        <div className="py-6 text-center text-muted-foreground">
+          No pending feature requests or bug reports
+        </div>
+      )
+    }
+    
+    return (
+      <div className="space-y-3 max-h-[420px] overflow-y-auto pr-2">
+        {featureAndBugRequests.map(request => (
+          <div key={request.id} className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <p className="font-medium">{request.students?.first_name} {request.students?.last_name}</p>
+                <Badge variant={request.type === 'bug' ? 'destructive' : 'default'}>
+                  {request.type === 'bug' ? 'Bug' : 'Feature'}
+                </Badge>
+              </div>
+              <p className="text-sm font-medium">{request.title}</p>
+              <p className="text-xs text-muted-foreground">
+                Submitted on {new Date(request.created_at).toLocaleDateString()}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge 
+                variant={
+                  request.status === 'rejected' ? 'destructive' : 
+                  request.status === 'pending' ? 'outline' : 
+                  request.status === 'in_development' ? 'default' :
+                  'secondary'
+                }
+              >
+                {request.status === 'pending' ? 'Pending' : 
+                 request.status === 'rejected' ? 'Rejected' : 
+                 request.status === 'in_development' ? 'In Development' :
+                 'Completed'}
+              </Badge>
+              <Button 
+                size="sm" 
+                variant="outline" 
+                onClick={() => openStatusDialog(request)}
+              >
+                Update
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  // Render other requests or empty state
+  const renderRequestsOrEmpty = (requests: PinRequest[] | QuizRequest[] | PracticeRequest[], emptyMessage: string) => {
     if (isLoading) {
       return (
         <div className="space-y-3">
@@ -91,7 +264,7 @@ export default function RequestsPage() {
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-semibold">Student Requests</h1>
         <Button 
-          onClick={refreshRequests}
+          onClick={fetchRequests}
           disabled={isLoading}
           className="gap-2"
         >
@@ -141,10 +314,53 @@ export default function RequestsPage() {
             <CardTitle className="text-lg">Feature Requests & Bug Reports</CardTitle>
           </CardHeader>
           <CardContent>
-            {renderRequestsOrEmpty(featureAndBugRequests, "No pending feature requests or bug reports")}
+            {renderFeatureRequests()}
           </CardContent>
         </Card>
       </div>
+      
+      {/* Status Update Dialog */}
+      <Dialog open={openDialog} onOpenChange={setOpenDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Update Request Status</DialogTitle>
+            <DialogDescription>
+              Update the status of this request from {selectedRequest?.students?.first_name} {selectedRequest?.students?.last_name}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <p className="font-medium text-sm">{selectedRequest?.title}</p>
+              <p className="text-sm text-muted-foreground">{selectedRequest?.description}</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="status">Status</Label>
+              <Select 
+                value={newStatus} 
+                onValueChange={setNewStatus}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="in_development">In Development</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="rejected">Rejected</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpenDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={updateRequestStatus}>
+              Update Status
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 } 

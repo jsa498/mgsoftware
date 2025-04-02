@@ -36,6 +36,11 @@ export function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/', request.url))
     }
     
+    // Admin tries to access student requests page
+    if (userRole === 'admin' && path === '/student-requests') {
+      return NextResponse.redirect(new URL('/requests', request.url))
+    }
+    
     // Student tries to access admin dashboard (root path)
     if (userRole === 'student' && path === '/' && !path.startsWith('/student-dashboard')) {
       return NextResponse.redirect(new URL('/student-dashboard', request.url))
@@ -44,6 +49,11 @@ export function middleware(request: NextRequest) {
     // Student tries to access students page
     if (userRole === 'student' && path === '/students') {
       return NextResponse.redirect(new URL('/student-dashboard', request.url))
+    }
+    
+    // Student tries to access main requests page
+    if (userRole === 'student' && path === '/requests') {
+      return NextResponse.redirect(new URL('/student-requests', request.url))
     }
     
     // Student tries to access groups page

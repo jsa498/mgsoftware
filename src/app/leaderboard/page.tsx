@@ -82,7 +82,7 @@ export default function Leaderboard() {
       
       return () => clearInterval(intervalId);
     }
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   
   // Function to fetch active practicing sessions
   const fetchActivePracticingSessions = async () => {
