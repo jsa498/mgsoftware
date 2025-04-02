@@ -231,8 +231,8 @@ export default function StudentsPage() {
       
       if (studentError) throw studentError;
       
-      // 2. Create user account for the student
-      const { error: userError } = await supabase
+      // First try using just the first name as username
+      let { error: userError } = await supabase
         .from('users')
         .insert([{
           username: firstName.toLowerCase(),
@@ -240,6 +240,27 @@ export default function StudentsPage() {
           role: 'student',
           student_id: studentData.id
         }]);
+      
+      // If there's an error and it's about duplicate username, use firstName + phone digits
+      if (userError && userError.code === '23505') { // Unique constraint violation
+        // Extract last 4 digits from phone number for unique username
+        const phoneDigits = contactNumber.replace(/\D/g, '');
+        const last4Digits = phoneDigits.slice(-4);
+        const uniqueUsername = `${firstName.toLowerCase()}_${last4Digits}`;
+        
+        // Try with the unique username
+        const { error: retryError } = await supabase
+          .from('users')
+          .insert([{
+            username: uniqueUsername,
+            pin: pin,
+            role: 'student',
+            student_id: studentData.id
+          }]);
+          
+        // Update userError to the latest error (or null if successful)
+        userError = retryError;
+      }
       
       if (userError) throw userError;
       

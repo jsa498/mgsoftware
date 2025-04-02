@@ -1,6 +1,6 @@
-# Profile Image Upload - Issue Analysis and Solution
+Profile Image Upload - Issue Analysis and Solution
 
-## Current Issue
+Current Issue
 
 Students are unable to upload profile pictures to their accounts. When attempting to upload a profile image, the following error occurs:
 
@@ -11,7 +11,7 @@ data-service.ts:1402 Error uploading profile image:
 
 This indicates a Row Level Security (RLS) policy violation in Supabase storage.
 
-## Analysis
+Analysis
 
 After investigation, we identified the following key points:
 
@@ -21,7 +21,7 @@ After investigation, we identified the following key points:
    - Session persistence is maintained via cookies and session storage
 
 2. **Supabase Client:**
-   - The Supabase client is initialized using only the anonymous key
+   - The Supabase client is initialized using only the anon key
    - No proper Supabase session token is created during authentication
 
 3. **Storage Configuration:**
@@ -35,15 +35,15 @@ After investigation, we identified the following key points:
    - Since the client is not authenticated with Supabase Auth, it appears as anonymous
    - This causes the RLS policy violation (403 error)
 
-## Conclusion
+Conclusion
 
 The root cause is a mismatch between our custom authentication system and Supabase's RLS expectations. Since we're using our own authentication but not properly passing authentication tokens to Supabase, the storage operations fail due to RLS policy violations.
 
-## Recommended Solution
+Recommended Solution
 
-Create a server-side API route that uses the Supabase service role key to perform storage operations, bypassing RLS policies.
+Create a server-side API route that uses the Supabase service role key which you can find in the .env.local file if needed, to perform storage operations, bypassing RLS policies.
 
-### Implementation Plan
+Implementation Plan
 
 1. **Create a New API Route:**
    - Path: `src/app/api/profile-image/route.ts`
@@ -70,9 +70,9 @@ Create a server-side API route that uses the Supabase service role key to perfor
    - Validate file types and sizes
    - Consider adding image optimization
 
-### Detailed Implementation Guidelines
+Detailed Implementation Guidelines
 
-#### 1. API Route Implementation
+1. API Route Implementation - (this is just what i think might be a good implimentation, idk if it is the exact and best though, you can decide what to do after your analysis)
 
 ```typescript
 // src/app/api/profile-image/route.ts
@@ -179,7 +179,7 @@ export async function POST(request: NextRequest) {
 }
 ```
 
-#### 2. Client-Side Data Service Update
+2. Client-Side Data Service Update
 
 ```typescript
 // Modify src/lib/data-service.ts
@@ -210,17 +210,10 @@ export async function updateProfileImage(studentId: string, file: File): Promise
 }
 ```
 
-## Benefits of This Approach
+Benefits of This Approach
 
 1. **Security:** Service role key remains secure on the server
 2. **Simplified Auth:** Leverages existing authentication system
 3. **Performance:** Server can handle image validation/processing
 4. **Maintainability:** Clear separation of concerns between client and server
 5. **Flexibility:** Easy to add additional functionality like image optimization
-
-## Next Steps
-
-1. Implement the server-side API route
-2. Update the client-side implementation
-3. Test thoroughly with different image types and sizes
-4. Monitor for any errors and adjust as needed 
