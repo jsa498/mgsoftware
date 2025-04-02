@@ -93,6 +93,7 @@ export type RecentActivity = {
   status: string;
   started_at: string;
   completed_at?: string;
+  activity_type: 'practice' | 'login';
 };
 
 export type FeeAlert = {

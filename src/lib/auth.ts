@@ -5,6 +5,7 @@ export interface User {
   id: number;
   username: string;
   role: string;
+  student_id?: string;
 }
 
 // Authenticate user with username and PIN
@@ -12,7 +13,7 @@ export async function authenticateUser(username: string, pin: string): Promise<U
   try {
     const { data, error } = await supabase
       .from('users')
-      .select('id, username, role')
+      .select('id, username, role, student_id')
       .eq('username', username.toLowerCase())
       .eq('pin', pin)
       .single();
@@ -20,6 +21,14 @@ export async function authenticateUser(username: string, pin: string): Promise<U
     if (error || !data) {
       console.error('Authentication error:', error);
       return null;
+    }
+
+    // Record login if it's a student
+    if (data.role === 'student' && data.student_id) {
+      await supabase
+        .from('student_logins')
+        .insert([{ student_id: data.student_id }])
+        .select();
     }
 
     return data as User;

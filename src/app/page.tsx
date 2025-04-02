@@ -2,7 +2,7 @@ import { DashboardLayout } from "@/components/dashboard-layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { Users, UserPlus2, MessageSquare, FileMusic } from "lucide-react"
+import { Users, UserPlus2, MessageSquare, FileMusic, Clock, LogIn } from "lucide-react"
 import { getDashboardStats, getRecentActivity, getFeeAlerts } from "@/lib/data-service"
 
 // This forces Next.js to treat this as a dynamic route that won't be cached
@@ -75,13 +75,18 @@ export default async function Home() {
                     <div key={activity.id}>
                       <div className="flex items-center gap-2">
                         <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                          <Users className="h-4 w-4 text-primary" />
+                          {activity.activity_type === 'practice' ? (
+                            <Clock className="h-4 w-4 text-primary" />
+                          ) : (
+                            <LogIn className="h-4 w-4 text-primary" />
+                          )}
                         </div>
                         <div className="flex-1 space-y-1">
                           <p className="text-sm font-medium leading-none">
-                            {activity.student_name} {activity.status} practice session
+                            {activity.student_name} {activity.status}
+                            {activity.activity_type === 'practice' && ' practice session'}
                           </p>
-                          {activity.duration_minutes && activity.points && (
+                          {activity.duration_minutes && activity.points && activity.activity_type === 'practice' && (
                             <p className="text-xs text-muted-foreground">
                               {activity.duration_minutes} minutes, {activity.points} points
                             </p>

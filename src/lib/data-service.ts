@@ -62,10 +62,10 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 export async function getRecentActivity(): Promise<RecentActivity[]> {
   try {
     const { data, error } = await supabase
-      .from('recent_activity')
+      .from('combined_activity')
       .select('*')
       .order('started_at', { ascending: false })
-      .limit(10);
+      .limit(20);
     
     if (error) throw error;
     
