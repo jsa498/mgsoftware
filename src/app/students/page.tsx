@@ -41,7 +41,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { getStudentGroups, getStudentFeeInfo, getAllGroups, deleteStudent, updateFeePaidUntil, createStudentFeeRecord, updateStudentProfile, updateUsername, updateStudentGroups, getStudentsWithDetails, searchStudents } from "@/lib/data-service";
+import { getStudentGroups, getStudentFeeInfo, getAllGroups, deleteStudent, updateFeePaidUntil, createStudentFeeRecord, updateStudentProfile, updateUsername, updateStudentGroups, getStudentsWithDetails, searchStudents, getStudentPin } from "@/lib/data-service";
 import { Student, Group, Fee } from "@/lib/types";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/components/ui/use-toast";
@@ -75,6 +75,8 @@ export default function StudentsPage() {
   const [isUpdatingFee, setIsUpdatingFee] = useState<Record<string, boolean>>({});
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [studentUsername, setStudentUsername] = useState("");
+  const [studentPin, setStudentPin] = useState("");
+  const [showStudentPin, setShowStudentPin] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [editingPhone, setEditingPhone] = useState("");
   const [savingPhone, setSavingPhone] = useState(false);
@@ -499,11 +501,17 @@ export default function StudentsPage() {
         setEditingUsername("");
       }
       
+      // Get student PIN
+      const studentPin = await getStudentPin(student.id);
+      setStudentPin(studentPin || "");
+      setShowStudentPin(false);
+      
       setProfileModalOpen(true);
     } catch (error) {
       console.error("Error fetching student username:", error);
       setStudentUsername("");
       setEditingUsername("");
+      setStudentPin("");
       setProfileModalOpen(true);
     }
   };
@@ -990,6 +998,32 @@ export default function StudentsPage() {
                         onChange={(e) => setEditingUsername(e.target.value)}
                         className="flex-1"
                       />
+                    </div>
+                  </div>
+                
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Label htmlFor="studentPin">PIN</Label>
+                    </div>
+                    <div className="flex gap-2 items-center">
+                      <div className="relative flex-1">
+                        <Input
+                          id="studentPin"
+                          type={showStudentPin ? "text" : "password"}
+                          value={studentPin}
+                          readOnly
+                          className="pr-10"
+                        />
+                        <Button 
+                          type="button"
+                          variant="ghost" 
+                          size="icon" 
+                          className="absolute right-2 top-1/2 transform -translate-y-1/2"
+                          onClick={() => setShowStudentPin(!showStudentPin)}
+                        >
+                          {showStudentPin ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 

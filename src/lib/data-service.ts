@@ -1456,6 +1456,30 @@ export async function updateUsername(studentId: string, username: string): Promi
 }
 
 /**
+ * Retrieves a student's PIN from the users table
+ * This is an admin-only function and should be used carefully
+ */
+export async function getStudentPin(studentId: string): Promise<string | null> {
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('pin')
+      .eq('student_id', studentId)
+      .single();
+    
+    if (error) {
+      console.error('Error retrieving student PIN:', error);
+      return null;
+    }
+    
+    return data?.pin || null;
+  } catch (error) {
+    console.error('Error retrieving student PIN:', error);
+    return null;
+  }
+}
+
+/**
  * Updates the profile image for the currently authenticated student.
  * Uses the server-side API endpoint to handle the upload securely.
  */
