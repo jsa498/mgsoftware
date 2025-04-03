@@ -10,6 +10,7 @@ import {
   BarChart2,
   RotateCcw,
   Clock,
+  Calendar,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -22,7 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { getPracticeLeaderboard, getQuizLeaderboard, updateQuizPoints, getActivePracticingSessions } from "@/lib/data-service";
+import { getPracticeLeaderboard, getQuizLeaderboard, updateQuizPoints, getActivePracticingSessions, getStudentPracticeHistory } from "@/lib/data-service";
 import { toast } from "@/components/ui/use-toast";
 import { isAdmin } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
@@ -52,6 +53,18 @@ type QuizLeaderboardItem = {
   rank: number;
 };
 
+// Add type for practice history
+type PracticeHistoryItem = {
+  id: string;
+  student_id: string;
+  duration_minutes: number;
+  points: number;
+  status: string;
+  started_at: string;
+  completed_at: string;
+  created_at: string;
+};
+
 export default function Leaderboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [practiceData, setPracticeData] = useState<PracticeLeaderboardItem[]>([]);
@@ -59,11 +72,18 @@ export default function Leaderboard() {
   const [loading, setLoading] = useState(true);
   const [isUserAdmin, setIsUserAdmin] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
+  const [selectedStudentName, setSelectedStudentName] = useState<string>("");
   const [timeDialogOpen, setTimeDialogOpen] = useState(false);
   const [timeAction, setTimeAction] = useState<"add" | "deduct">("add");
   const [timeHours, setTimeHours] = useState<string>("0");
   const [timeMinutes, setTimeMinutes] = useState<string>("15");
   const [activePracticingSessions, setActivePracticingSessions] = useState<string[]>([]);
+  
+  // New state for practice history
+  const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
+  const [practiceHistory, setPracticeHistory] = useState<PracticeHistoryItem[]>([]);
+  const [historyPeriod, setHistoryPeriod] = useState<'day' | 'week' | 'month' | 'all'>('all');
+  const [loadingHistory, setLoadingHistory] = useState(false);
   
   // Fetch leaderboard data on component mount
   useEffect(() => {
@@ -249,6 +269,61 @@ export default function Leaderboard() {
     setTimeDialogOpen(true);
   };
   
+  // Function to open practice history dialog
+  const openHistoryDialog = async (studentId: string, studentName: string) => {
+    setSelectedStudent(studentId);
+    setSelectedStudentName(studentName);
+    setHistoryDialogOpen(true);
+    fetchPracticeHistory(studentId, historyPeriod);
+  };
+  
+  // Function to fetch practice history
+  const fetchPracticeHistory = async (studentId: string, period: 'day' | 'week' | 'month' | 'all') => {
+    if (!studentId) return;
+    
+    setLoadingHistory(true);
+    try {
+      const history = await getStudentPracticeHistory(studentId, period);
+      setPracticeHistory(history);
+    } catch (error) {
+      console.error("Error fetching practice history:", error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch practice history. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+  
+  // Handle period change for practice history
+  const handleHistoryPeriodChange = (period: 'day' | 'week' | 'month' | 'all') => {
+    setHistoryPeriod(period);
+    if (selectedStudent) {
+      fetchPracticeHistory(selectedStudent, period);
+    }
+  };
+  
+  // Format date for display
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleString();
+  };
+  
+  // Calculate duration between two dates (for display purposes)
+  const calculateDuration = (startDate: string, endDate: string) => {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const diffMs = end.getTime() - start.getTime();
+    
+    const diffMins = Math.floor(diffMs / 60000);
+    const hours = Math.floor(diffMins / 60);
+    const mins = diffMins % 60;
+    
+    return `${hours}h ${mins}m`;
+  };
+  
   // Filter practice data based on search query
   const filteredPracticeData = practiceData.filter((student) =>
     student.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -260,7 +335,7 @@ export default function Leaderboard() {
   );
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-2 md:p-6 space-y-4 md:space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold flex items-center">
           <Trophy className="mr-2 h-8 w-8" /> Leaderboard
@@ -314,8 +389,8 @@ export default function Leaderboard() {
                 <TableRow>
                   <TableHead className="w-[100px]">Rank</TableHead>
                   <TableHead>Student</TableHead>
-                  <TableHead>Practice Time</TableHead>
-                  <TableHead>Practice Points</TableHead>
+                  <TableHead>PT</TableHead>
+                  <TableHead>PTP</TableHead>
                   {isUserAdmin && (
                     <TableHead className="w-[50px]"></TableHead>
                   )}
@@ -351,7 +426,10 @@ export default function Leaderboard() {
                         )}
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2">
+                        <div 
+                          className="flex items-center gap-2 cursor-pointer hover:underline"
+                          onClick={() => openHistoryDialog(student.student_id, student.name)}
+                        >
                           {isUserAdmin && activePracticingSessions.includes(student.student_id) && (
                             <div className="h-2.5 w-2.5 rounded-full bg-green-500 animate-pulse" 
                                  title="Currently practicing" />
@@ -367,13 +445,15 @@ export default function Leaderboard() {
                       </TableCell>
                       {isUserAdmin && (
                         <TableCell>
-                          <Button 
-                            variant="ghost" 
-                            size="icon"
-                            onClick={() => openTimeDialog(student.student_id)}
-                          >
-                            <Clock className="h-4 w-4" />
-                          </Button>
+                          <div className="flex gap-2">
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              onClick={() => openTimeDialog(student.student_id)}
+                            >
+                              <Clock className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </TableCell>
                       )}
                     </TableRow>
@@ -526,6 +606,110 @@ export default function Leaderboard() {
             </Button>
             <Button onClick={handleTimeDialogSubmit}>
               {timeAction === "add" ? "Add Time" : "Deduct Time"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Practice History Dialog */}
+      <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
+        <DialogContent className="sm:max-w-[700px] max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Practice History - {selectedStudentName}</DialogTitle>
+            <DialogDescription>
+              View practice sessions completed by this student.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4">
+            <div className="flex justify-center mb-4">
+              <div className="inline-flex items-center rounded-md border p-1">
+                <Button 
+                  variant={historyPeriod === "day" ? "default" : "outline"} 
+                  className="rounded-sm px-3"
+                  onClick={() => handleHistoryPeriodChange("day")}
+                >
+                  Today
+                </Button>
+                <Button 
+                  variant={historyPeriod === "week" ? "default" : "outline"} 
+                  className="rounded-sm px-3"
+                  onClick={() => handleHistoryPeriodChange("week")}
+                >
+                  Week
+                </Button>
+                <Button 
+                  variant={historyPeriod === "month" ? "default" : "outline"} 
+                  className="rounded-sm px-3"
+                  onClick={() => handleHistoryPeriodChange("month")}
+                >
+                  Month
+                </Button>
+                <Button 
+                  variant={historyPeriod === "all" ? "default" : "outline"} 
+                  className="rounded-sm px-3"
+                  onClick={() => handleHistoryPeriodChange("all")}
+                >
+                  All Time
+                </Button>
+              </div>
+            </div>
+            
+            {loadingHistory ? (
+              <div className="flex justify-center items-center h-36">
+                <p>Loading practice history...</p>
+              </div>
+            ) : practiceHistory.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <Calendar className="h-12 w-12 text-muted-foreground mb-4" />
+                <p className="text-lg font-medium">No practice sessions found</p>
+                <p className="text-sm text-muted-foreground">
+                  {historyPeriod === "day" 
+                    ? "No practice sessions recorded today." 
+                    : historyPeriod === "week"
+                    ? "No practice sessions recorded this week."
+                    : historyPeriod === "month"
+                    ? "No practice sessions recorded this month."
+                    : "No practice sessions recorded."}
+                </p>
+              </div>
+            ) : (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Started At</TableHead>
+                      <TableHead>Completed At</TableHead>
+                      <TableHead>Duration</TableHead>
+                      <TableHead>Points</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {practiceHistory.map((session) => (
+                      <TableRow key={session.id}>
+                        <TableCell>{formatDate(session.started_at)}</TableCell>
+                        <TableCell>{formatDate(session.completed_at || session.started_at)}</TableCell>
+                        <TableCell>
+                          {session.duration_minutes 
+                            ? `${Math.floor(session.duration_minutes / 60)}h ${session.duration_minutes % 60}m` 
+                            : calculateDuration(session.started_at, session.completed_at || session.started_at)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">
+                            {parseFloat(session.points.toString()).toFixed(2)}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setHistoryDialogOpen(false)}>
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>

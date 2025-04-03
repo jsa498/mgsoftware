@@ -65,7 +65,7 @@ export async function getRecentActivity(): Promise<RecentActivity[]> {
       .from('combined_activity')
       .select('*')
       .order('started_at', { ascending: false })
-      .limit(20);
+      .limit(50);
     
     if (error) throw error;
     
@@ -2193,4 +2193,43 @@ export async function getActivePracticingSessions(): Promise<string[]> {
     console.error('Error fetching active practicing sessions:', error);
     return [];
   }
-} 
+}
+
+/**
+ * Fetches detailed practice history for a specific student
+ */
+export async function getStudentPracticeHistory(studentId: string, period: 'day' | 'week' | 'month' | 'all' = 'all') {
+  try {
+    let query = supabase
+      .from('practice_sessions')
+      .select('*')
+      .eq('student_id', studentId)
+      .eq('status', 'completed')
+      .order('started_at', { ascending: false });
+    
+    // Apply time filter
+    const now = new Date();
+    
+    if (period === 'day') {
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      query = query.gte('started_at', today.toISOString());
+    } else if (period === 'week') {
+      const weekStart = new Date(now);
+      weekStart.setDate(now.getDate() - now.getDay());
+      weekStart.setHours(0, 0, 0, 0);
+      query = query.gte('started_at', weekStart.toISOString());
+    } else if (period === 'month') {
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      query = query.gte('started_at', monthStart.toISOString());
+    }
+    
+    const { data, error } = await query;
+    
+    if (error) throw error;
+    
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching student practice history:', error);
+    return [];
+  }
+}
