@@ -35,12 +35,14 @@ export function Sidebar({ className, ...props }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [practiceOpen, setPracticeOpen] = useState(false)
-  const isUserAdmin = isAdmin()
+  const [isUserAdmin, setIsUserAdmin] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   
-  // Check for mobile view
+  // Check for admin status and mobile view after component mounts
   useEffect(() => {
+    setIsUserAdmin(isAdmin())
+    
     const checkIfMobile = () => {
       setIsMobile(window.innerWidth < 768)
     }

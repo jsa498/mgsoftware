@@ -35,7 +35,7 @@ interface Student {
 interface FeatureRequest {
   id: string
   student_id: string
-  type: 'feature' | 'bug'
+  type: 'feature' | 'bug' | 'pin'
   title: string
   description: string
   status: 'pending' | 'in_development' | 'completed' | 'rejected'
@@ -89,10 +89,10 @@ export default function RequestsPage() {
   )
   
   // Filter requests by type
-  const pinChangeRequests = requests.filter(req => 'requestType' in req && req.requestType === 'pin') as PinRequest[]
+  const pinChangeRequests = requests.filter(req => 'type' in req && req.type === 'pin') as FeatureRequest[]
   const quizRetryRequests = requests.filter(req => 'requestType' in req && req.requestType === 'quiz') as QuizRequest[]
   const practiceRetryRequests = requests.filter(req => 'requestType' in req && req.requestType === 'practice') as PracticeRequest[]
-  const featureAndBugRequests = requests.filter(req => 'type' in req) as FeatureRequest[]
+  const featureAndBugRequests = requests.filter(req => 'type' in req && (req.type === 'feature' || req.type === 'bug')) as FeatureRequest[]
 
   // Fetch requests from server
   const fetchRequests = async () => {
@@ -155,6 +155,71 @@ export default function RequestsPage() {
     setOpenDialog(true);
   }
 
+  // Approve PIN change request
+  const approvePinChange = async (request: FeatureRequest) => {
+    if (!request || request.type !== 'pin') return;
+    
+    try {
+      let pinDetails;
+      try {
+        pinDetails = JSON.parse(request.description);
+      } catch (e) {
+        console.error('Error parsing PIN request details:', e);
+        return;
+      }
+      
+      if (!pinDetails.newPin) {
+        console.error('New PIN is missing from request');
+        return;
+      }
+      
+      // Update the user's PIN
+      const { error: userError } = await supabase
+        .from('users')
+        .update({ pin: pinDetails.newPin })
+        .eq('student_id', request.student_id);
+      
+      if (userError) throw userError;
+      
+      // Update request status to completed (approved)
+      const { error: requestError } = await supabase
+        .from('feature_requests')
+        .update({ 
+          status: 'completed',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', request.id);
+      
+      if (requestError) throw requestError;
+      
+      fetchRequests(); // Refresh the list
+    } catch (error) {
+      console.error('Error approving PIN change request:', error);
+    }
+  }
+  
+  // Reject PIN change request
+  const rejectPinChange = async (request: FeatureRequest) => {
+    if (!request || request.type !== 'pin') return;
+    
+    try {
+      // Update request status
+      const { error } = await supabase
+        .from('feature_requests')
+        .update({ 
+          status: 'rejected',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', request.id);
+      
+      if (error) throw error;
+      
+      fetchRequests(); // Refresh the list
+    } catch (error) {
+      console.error('Error rejecting PIN change request:', error);
+    }
+  }
+
   // Render feature requests or empty state
   const renderFeatureRequests = () => {
     if (isLoading) {
@@ -214,6 +279,91 @@ export default function RequestsPage() {
             </div>
           </div>
         ))}
+      </div>
+    )
+  }
+
+  // Render PIN change requests
+  const renderPinRequests = () => {
+    if (isLoading) {
+      return (
+        <div className="space-y-3">
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-12 w-full" />
+        </div>
+      )
+    }
+    
+    if (pinChangeRequests.length === 0) {
+      return (
+        <div className="py-6 text-center text-muted-foreground">
+          No pending PIN change requests
+        </div>
+      )
+    }
+    
+    return (
+      <div className="space-y-3 max-h-[420px] overflow-y-auto pr-2">
+        {pinChangeRequests.map(request => {
+          let details;
+          try {
+            details = JSON.parse(request.description);
+          } catch {
+            details = { reason: request.description };
+          }
+          
+          const studentName = request.students ? 
+            `${request.students.first_name} ${request.students.last_name}` : 
+            'Unknown Student';
+          
+          return (
+            <div key={request.id} className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
+              <div className="flex-1">
+                <p className="font-medium">{studentName}</p>
+                <p className="text-sm font-medium">New PIN: {details.newPin}</p>
+                <p className="text-xs text-muted-foreground">
+                  Reason: {details.reason}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Submitted on {new Date(request.created_at).toLocaleDateString()}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge 
+                  variant={
+                    request.status === 'rejected' ? 'destructive' : 
+                    request.status === 'pending' ? 'outline' : 
+                    'secondary'
+                  }
+                >
+                  {request.status === 'pending' ? 'Pending' : 
+                   request.status === 'rejected' ? 'Rejected' : 
+                   'Approved'}
+                </Badge>
+                {request.status === 'pending' && (
+                  <>
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      className="text-green-500 hover:text-green-600 hover:bg-green-100/10"
+                      onClick={() => approvePinChange(request)}
+                    >
+                      Approve
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      className="text-red-500 hover:text-red-600 hover:bg-red-100/10"
+                      onClick={() => rejectPinChange(request)}
+                    >
+                      Reject
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
     )
   }
@@ -281,7 +431,7 @@ export default function RequestsPage() {
             <CardTitle className="text-lg">PIN Change Requests</CardTitle>
           </CardHeader>
           <CardContent>
-            {renderRequestsOrEmpty(pinChangeRequests, "No pending PIN change requests")}
+            {renderPinRequests()}
           </CardContent>
         </Card>
 
