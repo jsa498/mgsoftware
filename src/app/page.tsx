@@ -4,10 +4,13 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Users, UserPlus2, MessageSquare, FileMusic, Clock, LogIn } from "lucide-react"
 import { getDashboardStats, getRecentActivity, getFeeAlerts } from "@/lib/data-service"
-import { formatDateTime, formatDate } from "@/lib/date-utils"
+import { formatDateTimeWithTimezone } from "@/lib/date-utils"
 
 // This forces Next.js to treat this as a dynamic route that won't be cached
 export const dynamic = 'force-dynamic';
+
+// Client browser timezone will be used on the client side
+const timeZone = 'America/Vancouver'; // Default to Vancouver timezone for server rendering
 
 export default async function Home() {
   // Fetch data for dashboard
@@ -93,7 +96,7 @@ export default async function Home() {
                             </p>
                           )}
                           <p className="text-xs text-muted-foreground">
-                            {formatDateTime(activity.started_at)}
+                            {formatDateTimeWithTimezone(activity.started_at, timeZone)}
                           </p>
                         </div>
                       </div>
@@ -121,7 +124,7 @@ export default async function Home() {
                         <div className="space-y-1">
                           <p className="text-sm font-medium">{alert.student_name}</p>
                           <p className="text-xs text-muted-foreground">
-                            Fees paid until {formatDate(alert.paid_until)}
+                            Fees paid until {formatDateTimeWithTimezone(alert.paid_until, timeZone).split(',')[0]}
                           </p>
                         </div>
                         <Badge 

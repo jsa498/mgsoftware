@@ -36,7 +36,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { supabase } from "@/lib/supabase";
-import { formatDateTime } from "@/lib/date-utils";
+import { formatDateTimeWithTimezone } from "@/lib/date-utils";
+
+// Define timezone constant but don't export it
+const timeZone = 'America/Vancouver'; // Default to Vancouver timezone
 
 // Define types for our leaderboard data
 type PracticeLeaderboardItem = {
@@ -308,7 +311,7 @@ export default function Leaderboard() {
   
   // Format date for display
   const formatDate = (dateString: string) => {
-    return formatDateTime(dateString);
+    return formatDateTimeWithTimezone(dateString, timeZone);
   };
   
   // Calculate duration between two dates (for display purposes)

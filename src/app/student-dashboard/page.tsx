@@ -18,11 +18,14 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { redirect } from "next/navigation"
-import { formatDateTime } from "@/lib/date-utils"
+import { formatDateTimeWithTimezone } from "@/lib/date-utils"
 
 // This forces Next.js to treat this as a dynamic route that won't be cached
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+
+// Client browser timezone will be used on the client side
+const timeZone = 'America/Vancouver'; // Default to Vancouver timezone for server rendering
 
 // Client component that fetches the user ID
 // Since we can't directly use getCurrentUser in a server component,
@@ -327,7 +330,7 @@ export default async function StudentDashboard() {
                             </p>
                           )}
                           <p className="text-xs text-muted-foreground">
-                            {formatDateTime(activity.started_at)}
+                            {formatDateTimeWithTimezone(activity.started_at, timeZone)}
                           </p>
                         </div>
                       </div>

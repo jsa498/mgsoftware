@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Input } from "@/components/ui/input"
+import { formatDateTimeWithTimezone } from "@/lib/date-utils"
 
 interface Message {
   id: string
@@ -34,6 +35,9 @@ interface Group {
   name: string
   description?: string
 }
+
+// Define timezone constant but don't export it
+const timeZone = 'America/Vancouver'; // Default to Vancouver timezone
 
 export default function GroupChatPage() {
   const router = useRouter()
@@ -165,13 +169,12 @@ export default function GroupChatPage() {
   }
 
   const formatMessageTime = (dateString: string) => {
-    // For messages, we want just the time portion
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat(undefined, {
-      hour: 'numeric',
-      minute: 'numeric',
-      hour12: true
-    }).format(date);
+    // Parse with our timezone-aware function first
+    const fullDate = formatDateTimeWithTimezone(dateString, timeZone);
+    // Then extract just the time portion
+    const timePart = fullDate.split(', ')[1].split(' ')[0]; // Get just the time
+    const amPm = fullDate.split(' ').pop(); // Get AM/PM
+    return `${timePart} ${amPm}`;
   }
 
   // Group messages by date
