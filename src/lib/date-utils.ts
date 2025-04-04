@@ -25,7 +25,8 @@ export function formatDateTime(dateString: string): string {
       hour12: true,
       timeZoneName: 'short'
     }).format(date);
-  } catch (error) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  } catch (_) {
     // Fallback if Intl API fails
     return date.toLocaleString();
   }
@@ -43,7 +44,8 @@ export function formatDate(dateString: string): string {
       month: 'long',
       day: 'numeric'
     }).format(date);
-  } catch (error) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  } catch (_) {
     // Fallback if Intl API fails
     return date.toLocaleDateString();
   }
