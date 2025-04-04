@@ -36,6 +36,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { supabase } from "@/lib/supabase";
+import { formatDateTime } from "@/lib/date-utils";
 
 // Define types for our leaderboard data
 type PracticeLeaderboardItem = {
@@ -307,8 +308,7 @@ export default function Leaderboard() {
   
   // Format date for display
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleString();
+    return formatDateTime(dateString);
   };
   
   // Calculate duration between two dates (for display purposes)

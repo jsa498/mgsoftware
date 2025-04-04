@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Input } from "@/components/ui/input"
+import { formatDateTime } from "@/lib/date-utils"
 
 interface Message {
   id: string
@@ -165,7 +166,13 @@ export default function GroupChatPage() {
   }
 
   const formatMessageTime = (dateString: string) => {
-    return format(new Date(dateString), "h:mm a")
+    // For messages, we want just the time portion
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat(undefined, {
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: true
+    }).format(date);
   }
 
   // Group messages by date

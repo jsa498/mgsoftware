@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Users, UserPlus2, MessageSquare, FileMusic, Clock, LogIn } from "lucide-react"
 import { getDashboardStats, getRecentActivity, getFeeAlerts } from "@/lib/data-service"
+import { formatDateTime, formatDate } from "@/lib/date-utils"
 
 // This forces Next.js to treat this as a dynamic route that won't be cached
 export const dynamic = 'force-dynamic';
@@ -92,7 +93,7 @@ export default async function Home() {
                             </p>
                           )}
                           <p className="text-xs text-muted-foreground">
-                            {new Date(activity.started_at).toLocaleString()}
+                            {formatDateTime(activity.started_at)}
                           </p>
                         </div>
                       </div>
@@ -120,7 +121,7 @@ export default async function Home() {
                         <div className="space-y-1">
                           <p className="text-sm font-medium">{alert.student_name}</p>
                           <p className="text-xs text-muted-foreground">
-                            Fees paid until {new Date(alert.paid_until).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                            Fees paid until {formatDate(alert.paid_until)}
                           </p>
                         </div>
                         <Badge 

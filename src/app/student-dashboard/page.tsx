@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { redirect } from "next/navigation"
+import { formatDateTime } from "@/lib/date-utils"
 
 // This forces Next.js to treat this as a dynamic route that won't be cached
 export const dynamic = 'force-dynamic';
@@ -326,7 +327,7 @@ export default async function StudentDashboard() {
                             </p>
                           )}
                           <p className="text-xs text-muted-foreground">
-                            {new Date(activity.started_at).toLocaleString()}
+                            {formatDateTime(activity.started_at)}
                           </p>
                         </div>
                       </div>
