@@ -219,9 +219,6 @@ export function Sidebar({ className, ...props }: SidebarProps) {
           </div>
         </div>
 
-        {/* Add padding to push content below the pill bar */}
-        <div className="pt-14"></div>
-
         {/* Mobile Menu Overlay */}
         <div 
           className={cn(

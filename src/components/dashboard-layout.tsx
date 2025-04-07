@@ -17,19 +17,14 @@ export function DashboardLayout({
 }: DashboardLayoutProps) {
   const [isMobile, setIsMobile] = useState(false)
   
-  // Check for mobile view
   useEffect(() => {
     const checkIfMobile = () => {
       setIsMobile(window.innerWidth < 768)
     }
     
-    // Set initial value
     checkIfMobile()
-    
-    // Add event listener
     window.addEventListener('resize', checkIfMobile)
     
-    // Cleanup
     return () => {
       window.removeEventListener('resize', checkIfMobile)
     }
