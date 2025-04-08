@@ -972,175 +972,177 @@ export default function StudentsPage() {
           
           {selectedStudent && (
             <div className="space-y-6">
-              <div className="flex flex-col md:flex-row gap-6">
-                <div>
-                  <Avatar className="h-32 w-32">
-                    {(selectedStudent as Student & { profile_image_url?: string }).profile_image_url ? (
-                      <AvatarImage src={(selectedStudent as Student & { profile_image_url?: string }).profile_image_url} alt={`${selectedStudent.first_name} ${selectedStudent.last_name}`} />
-                    ) : (
-                      <AvatarFallback className="text-4xl">
-                        <UserCircle2 className="h-16 w-16" />
-                      </AvatarFallback>
-                    )}
-                  </Avatar>
-                </div>
-                
-                <div className="flex-1 space-y-4">
+              <div className="overflow-y-auto max-h-[calc(100vh-16rem)] pr-2 space-y-6">
+                <div className="flex flex-col md:flex-row gap-6">
                   <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <Label htmlFor="username">Username</Label>
-                    </div>
-                    <div className="flex gap-2">
-                      <Input
-                        id="username"
-                        placeholder="Enter username"
-                        value={editingUsername}
-                        onChange={(e) => setEditingUsername(e.target.value)}
-                        className="flex-1"
-                      />
-                    </div>
-                  </div>
-                
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <Label htmlFor="studentPin">PIN</Label>
-                    </div>
-                    <div className="flex gap-2 items-center">
-                      <div className="relative flex-1">
-                        <Input
-                          id="studentPin"
-                          type={showStudentPin ? "text" : "password"}
-                          value={studentPin}
-                          readOnly
-                          className="pr-10"
-                        />
-                        <Button 
-                          type="button"
-                          variant="ghost" 
-                          size="icon" 
-                          className="absolute right-2 top-1/2 transform -translate-y-1/2"
-                          onClick={() => setShowStudentPin(!showStudentPin)}
-                        >
-                          {showStudentPin ? <EyeOff size={16} /> : <Eye size={16} />}
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                
-                  <div>
-                    <h3 className="font-medium flex items-center gap-2 text-muted-foreground">
-                      <User className="h-4 w-4" /> Full Name
-                    </h3>
-                    <div className="grid grid-cols-2 gap-2 mt-2">
-                      <Input
-                        placeholder="First name"
-                        value={editingFirstName}
-                        onChange={(e) => setEditingFirstName(e.target.value)}
-                      />
-                      <Input
-                        placeholder="Last name"
-                        value={editingLastName}
-                        onChange={(e) => setEditingLastName(e.target.value)}
-                      />
-                    </div>
-                    <div className="mt-2">
-                      <Button 
-                        onClick={handleUpdateUserInfo}
-                        disabled={savingUserInfo}
-                        size="sm"
-                      >
-                        {savingUserInfo ? "Saving..." : "Save Changes"}
-                      </Button>
-                    </div>
+                    <Avatar className="h-32 w-32">
+                      {(selectedStudent as Student & { profile_image_url?: string }).profile_image_url ? (
+                        <AvatarImage src={(selectedStudent as Student & { profile_image_url?: string }).profile_image_url} alt={`${selectedStudent.first_name} ${selectedStudent.last_name}`} />
+                      ) : (
+                        <AvatarFallback className="text-4xl">
+                          <UserCircle2 className="h-16 w-16" />
+                        </AvatarFallback>
+                      )}
+                    </Avatar>
                   </div>
                   
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <Phone className="h-4 w-4 text-muted-foreground" />
-                      <Label htmlFor="phone">Phone Number</Label>
+                  <div className="flex-1 space-y-4">
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Label htmlFor="username">Username</Label>
+                      </div>
+                      <div className="flex gap-2">
+                        <Input
+                          id="username"
+                          placeholder="Enter username"
+                          value={editingUsername}
+                          onChange={(e) => setEditingUsername(e.target.value)}
+                          className="flex-1"
+                        />
+                      </div>
                     </div>
-                    <div className="flex gap-2">
-                      <Input
-                        id="phone"
-                        placeholder="Enter phone number"
-                        value={editingPhone}
-                        onChange={(e) => setEditingPhone(e.target.value)}
-                        className="flex-1"
-                      />
-                      <Button 
-                        onClick={handleUpdatePhone}
-                        disabled={savingPhone}
-                        size="sm"
-                      >
-                        Save
-                      </Button>
+                  
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Label htmlFor="studentPin">PIN</Label>
+                      </div>
+                      <div className="flex gap-2 items-center">
+                        <div className="relative flex-1">
+                          <Input
+                            id="studentPin"
+                            type={showStudentPin ? "text" : "password"}
+                            value={studentPin}
+                            readOnly
+                            className="pr-10"
+                          />
+                          <Button 
+                            type="button"
+                            variant="ghost" 
+                            size="icon" 
+                            className="absolute right-2 top-1/2 transform -translate-y-1/2"
+                            onClick={() => setShowStudentPin(!showStudentPin)}
+                          >
+                            {showStudentPin ? <EyeOff size={16} /> : <Eye size={16} />}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  
+                    <div>
+                      <h3 className="font-medium flex items-center gap-2 text-muted-foreground">
+                        <User className="h-4 w-4" /> Full Name
+                      </h3>
+                      <div className="grid grid-cols-2 gap-2 mt-2">
+                        <Input
+                          placeholder="First name"
+                          value={editingFirstName}
+                          onChange={(e) => setEditingFirstName(e.target.value)}
+                        />
+                        <Input
+                          placeholder="Last name"
+                          value={editingLastName}
+                          onChange={(e) => setEditingLastName(e.target.value)}
+                        />
+                      </div>
+                      <div className="mt-2">
+                        <Button 
+                          onClick={handleUpdateUserInfo}
+                          disabled={savingUserInfo}
+                          size="sm"
+                        >
+                          {savingUserInfo ? "Saving..." : "Save Changes"}
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Phone className="h-4 w-4 text-muted-foreground" />
+                        <Label htmlFor="phone">Phone Number</Label>
+                      </div>
+                      <div className="flex gap-2">
+                        <Input
+                          id="phone"
+                          placeholder="Enter phone number"
+                          value={editingPhone}
+                          onChange={(e) => setEditingPhone(e.target.value)}
+                          className="flex-1"
+                        />
+                        <Button 
+                          onClick={handleUpdatePhone}
+                          disabled={savingPhone}
+                          size="sm"
+                        >
+                          Save
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-              
-              <Separator />
-              
-              <div>
-                <h3 className="font-medium flex items-center gap-2 mb-4 text-muted-foreground">
-                  <UsersRound className="h-4 w-4" /> Groups
-                </h3>
                 
-                <div className="mb-3">
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button 
-                        variant="outline" 
-                        className="w-full justify-between"
-                      >
-                        Manage Groups
-                        <PlusCircle size={16} className="ml-2" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[400px] p-0" align="start">
-                      <div className="p-4 max-h-[300px] overflow-y-auto">
-                        {availableGroups.length === 0 ? (
-                          <p className="text-sm text-muted-foreground">No groups available</p>
-                        ) : (
-                          <div className="space-y-2">
-                            {availableGroups.map((group) => (
-                              <div key={group.id} className="flex items-center space-x-2">
-                                <Checkbox 
-                                  id={`modal-group-${group.id}`} 
-                                  checked={editModalGroups.includes(group.id)}
-                                  onCheckedChange={() => handleToggleModalGroup(group.id)}
-                                />
-                                <Label htmlFor={`modal-group-${group.id}`} className="flex-1 cursor-pointer">
-                                  {group.name}
-                                </Label>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      <div className="border-t p-3 flex justify-end">
+                <Separator />
+                
+                <div>
+                  <h3 className="font-medium flex items-center gap-2 mb-4 text-muted-foreground">
+                    <UsersRound className="h-4 w-4" /> Groups
+                  </h3>
+                  
+                  <div className="mb-3">
+                    <Popover>
+                      <PopoverTrigger asChild>
                         <Button 
-                          onClick={handleUpdateGroups}
-                          disabled={savingGroups}
-                          size="sm"
+                          variant="outline" 
+                          className="w-full justify-between"
                         >
-                          {savingGroups ? "Saving..." : "Save Groups"}
+                          Manage Groups
+                          <PlusCircle size={16} className="ml-2" />
                         </Button>
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                
-                <div className="flex flex-wrap gap-2">
-                  {studentGroups[selectedStudent.id] && studentGroups[selectedStudent.id].length > 0 ? (
-                    studentGroups[selectedStudent.id].map((group) => (
-                      <Badge key={group.id} variant="secondary" className="text-sm py-1">
-                        {group.name}
-                      </Badge>
-                    ))
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No groups assigned</p>
-                  )}
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[400px] p-0" align="start">
+                        <div className="p-4 max-h-[300px] overflow-y-auto">
+                          {availableGroups.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">No groups available</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {availableGroups.map((group) => (
+                                <div key={group.id} className="flex items-center space-x-2">
+                                  <Checkbox 
+                                    id={`modal-group-${group.id}`} 
+                                    checked={editModalGroups.includes(group.id)}
+                                    onCheckedChange={() => handleToggleModalGroup(group.id)}
+                                  />
+                                  <Label htmlFor={`modal-group-${group.id}`} className="flex-1 cursor-pointer">
+                                    {group.name}
+                                  </Label>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <div className="border-t p-3 flex justify-end">
+                          <Button 
+                            onClick={handleUpdateGroups}
+                            disabled={savingGroups}
+                            size="sm"
+                          >
+                            {savingGroups ? "Saving..." : "Save Groups"}
+                          </Button>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-2">
+                    {studentGroups[selectedStudent.id] && studentGroups[selectedStudent.id].length > 0 ? (
+                      studentGroups[selectedStudent.id].map((group) => (
+                        <Badge key={group.id} variant="secondary" className="text-sm py-1">
+                          {group.name}
+                        </Badge>
+                      ))
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No groups assigned</p>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
