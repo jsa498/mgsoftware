@@ -2,7 +2,6 @@
 
 import { Sidebar } from "@/components/sidebar"
 import { ProtectedRoute } from "@/components/protected-route"
-import { useEffect, useState } from "react"
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -15,26 +14,11 @@ export function DashboardLayout({
   requireAdmin = false,
   requireStudent = false 
 }: DashboardLayoutProps) {
-  const [isMobile, setIsMobile] = useState(false)
-  
-  useEffect(() => {
-    const checkIfMobile = () => {
-      setIsMobile(window.innerWidth < 768)
-    }
-    
-    checkIfMobile()
-    window.addEventListener('resize', checkIfMobile)
-    
-    return () => {
-      window.removeEventListener('resize', checkIfMobile)
-    }
-  }, [])
-
   return (
     <ProtectedRoute requireAdmin={requireAdmin} requireStudent={requireStudent}>
       <div className="flex h-screen bg-background">
         <Sidebar className="w-64 hidden md:flex" />
-        <main className={`flex-1 overflow-auto p-6 relative min-w-0 ${isMobile ? 'pt-20' : ''}`}>
+        <main className="flex-1 overflow-auto p-6 relative">
           {children}
         </main>
       </div>
