@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/table";
 import { getPracticeLeaderboard, getQuizLeaderboard, updateQuizPoints, getActivePracticingSessions, getStudentPracticeHistory } from "@/lib/data-service";
 import { toast } from "@/components/ui/use-toast";
-import { isAdmin } from "@/lib/auth";
+import { isAdmin, getCurrentUser, User } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -75,6 +75,7 @@ export default function Leaderboard() {
   const [quizData, setQuizData] = useState<QuizLeaderboardItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [isUserAdmin, setIsUserAdmin] = useState(false);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
   const [selectedStudentName, setSelectedStudentName] = useState<string>("");
   const [timeDialogOpen, setTimeDialogOpen] = useState(false);
@@ -94,6 +95,8 @@ export default function Leaderboard() {
     fetchLeaderboardData();
     // Check if the current user is an admin
     setIsUserAdmin(isAdmin());
+    // Get the current user
+    setCurrentUser(getCurrentUser());
     
     // Set up polling for active practice sessions if user is admin
     if (isAdmin()) {
@@ -430,8 +433,12 @@ export default function Leaderboard() {
                       </TableCell>
                       <TableCell>
                         <div 
-                          className="flex items-center gap-2 cursor-pointer hover:underline"
-                          onClick={() => openHistoryDialog(student.student_id, student.name)}
+                          className={`flex items-center gap-2 ${isUserAdmin || (currentUser && currentUser.student_id === student.student_id) ? 'cursor-pointer hover:underline' : 'cursor-default'}`}
+                          onClick={() => {
+                            if (isUserAdmin || (currentUser && currentUser.student_id === student.student_id)) {
+                              openHistoryDialog(student.student_id, student.name);
+                            }
+                          }}
                         >
                           {isUserAdmin && activePracticingSessions.includes(student.student_id) && (
                             <div className="h-2.5 w-2.5 rounded-full bg-green-500 animate-pulse" 
