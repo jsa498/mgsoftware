@@ -240,7 +240,7 @@ export default function RequestsPage() {
     }
     
     return (
-      <div className="space-y-3 max-h-[420px] overflow-y-auto pr-2">
+      <div className="space-y-3 max-h-48 overflow-y-auto pr-2">
         {featureAndBugRequests.map(request => (
           <div key={request.id} className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
             <div className="flex-1">
@@ -303,7 +303,7 @@ export default function RequestsPage() {
     }
     
     return (
-      <div className="space-y-3 max-h-[420px] overflow-y-auto pr-2">
+      <div className="space-y-3 max-h-48 overflow-y-auto pr-2">
         {pinChangeRequests.map(request => {
           let details;
           try {
@@ -388,7 +388,7 @@ export default function RequestsPage() {
     }
     
     return (
-      <div className="space-y-3 max-h-[420px] overflow-y-auto pr-2">
+      <div className="space-y-3 max-h-48 overflow-y-auto pr-2">
         {requests.map(request => (
           <div key={request.id} className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
             <div>
