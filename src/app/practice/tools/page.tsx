@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { PlayIcon, PauseIcon, MinusIcon, PlusIcon, ChevronLeftIcon, ChevronRightIcon, VolumeIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
@@ -38,8 +38,24 @@ import { useToast } from "@/components/ui/use-toast"
 import { getCurrentUser } from "@/lib/auth"
 import { getStudentProfileByUserId } from "@/lib/data-service"
 import { InstrumentVerificationDialog } from "@/components/InstrumentVerificationDialog"
+import { supabase } from "@/lib/supabase"
 
 const notes = ["A", "A#", "B", "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#"]
+
+const noteFileMap: { [key: string]: string } = {
+  "A": "A.mp3",
+  "A#": "A_sharp.mp3",
+  "B": "B.mp3",
+  "C": "C.mp3",
+  "C#": "C_sharp.mp3",
+  "D": "D.mp3",
+  "D#": "D_sharp.mp3",
+  "E": "E.mp3",
+  "F": "F.mp3",
+  "F#": "F_sharp.mp3",
+  "G": "G.mp3",
+  "G#": "G_sharp.mp3",
+};
 
 export default function PracticeToolsPage() {
   const [bpm, setBpm] = useState(100)
@@ -72,6 +88,20 @@ export default function PracticeToolsPage() {
   
   // Timer ref to store interval ID
   const timerRef = useRef<NodeJS.Timeout | null>(null)
+  const noteAudioRefs = useRef<Record<string, HTMLAudioElement>>({});
+  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+  
+  // Add instrument, taal, and raag state with dynamic raag options
+  const [instrument, setInstrument] = useState("sitar")
+  const [taal, setTaal] = useState("teental")
+  const raagOptions: string[] = useMemo<string[]>(() => {
+    if (instrument === "sitar" && taal === "teental") {
+      return ["bhimpalasi"]
+    }
+    return ["charukeshi", "bhairav", "yaman"]
+  }, [instrument, taal])
+  const [raag, setRaag] = useState<string>(raagOptions[0])
+  const lehraAudioRef = useRef<HTMLAudioElement | null>(null)
   
   const { toast } = useToast()
   
@@ -170,6 +200,77 @@ export default function PracticeToolsPage() {
     }
   }, [startTimer, calculatePoints])
   
+  // Preload all Tanpura audio files on mount for immediate playback
+  useEffect(() => {
+    Object.entries(noteFileMap).forEach(([note, fileName]) => {
+      const { data } = supabase.storage.from('instrument-audio').getPublicUrl(fileName)
+      const url = data?.publicUrl
+      if (url) {
+        const audio = new Audio(url)
+        audio.loop = true
+        audio.preload = 'auto'
+        audio.volume = volumes.tanpura / 100
+        audio.load()
+        noteAudioRefs.current[note] = audio
+      } else {
+        console.error(`Could not preload audio for note ${note}`)
+      }
+    })
+  }, [])
+
+  // Preload Lehra audio when instrument, taal, or raag changes
+  useEffect(() => {
+    // Normalize naming for stored files
+    const taalSpelling = taal === "teental" ? "teentaal" : taal
+    const fileName = `${instrument}_${taalSpelling}_${raag}.mp3`
+    const { data } = supabase.storage.from('instrument-audio').getPublicUrl(fileName)
+    const url = data?.publicUrl
+    if (url) {
+      // Stop previous Lehra if any
+      if (lehraAudioRef.current) {
+        lehraAudioRef.current.pause()
+      }
+      const audio = new Audio(url)
+      audio.loop = true
+      audio.preload = 'auto'
+      audio.volume = volumes.lehra / 100
+      audio.load()
+      lehraAudioRef.current = audio
+    } else {
+      console.error(`Could not preload Lehra audio for ${fileName}`)
+    }
+  }, [instrument, taal, raag, volumes.lehra])
+
+  // Control Lehra playback when play state or volume changes
+  useEffect(() => {
+    const audio = lehraAudioRef.current
+    if (!audio) return
+    audio.volume = volumes.lehra / 100
+    if (isAudioPlaying) {
+      audio.play().catch(e => console.error('Error playing Lehra audio:', e))
+    } else {
+      audio.pause()
+    }
+  }, [isAudioPlaying, volumes.lehra])
+
+  // Control Tanpura audio playback when note, play state, or volume changes
+  useEffect(() => {
+    // Pause previously playing audio not matching current note
+    if (currentAudioRef.current && currentAudioRef.current !== noteAudioRefs.current[currentNote]) {
+      currentAudioRef.current.pause()
+    }
+    const audio = noteAudioRefs.current[currentNote]
+    if (!audio) return
+
+    audio.volume = volumes.tanpura / 100
+    if (isAudioPlaying) {
+      audio.play().catch(e => console.error("Error playing audio:", e))
+    } else {
+      audio.pause()
+    }
+    currentAudioRef.current = audio
+  }, [currentNote, isAudioPlaying, volumes.tanpura])
+
   // Handle visibility changes
   useEffect(() => {
     if (!isPlaying) return
@@ -338,13 +439,12 @@ export default function PracticeToolsPage() {
     }
   }
 
-  // Function to handle the bottom play button separately from practice session
+  // Handle the bottom play button separately from practice session
   const handleBottomPlayButton = () => {
-    // This will just play/pause the audio without affecting the practice session
     console.log("Bottom play button clicked - independent from practice session")
-    // Toggle audio playback state
-    setIsAudioPlaying(!isAudioPlaying)
-    // Add actual audio playback logic here
+    // Toggle only the audio playback state
+    setIsAudioPlaying(prev => !prev)
+    // Add any additional audio logic here
   }
 
   // Handle continue after verification
@@ -352,6 +452,13 @@ export default function PracticeToolsPage() {
     setVerificationOpen(false)
     handleStartPractice()
   }
+
+  // Ensure raag state stays in sync when options change
+  useEffect(() => {
+    if (!raagOptions.includes(raag)) {
+      setRaag(raagOptions[0])
+    }
+  }, [raagOptions])
 
   return (
     <TooltipProvider>
@@ -512,9 +619,9 @@ export default function PracticeToolsPage() {
 
           {/* Instrument Selection */}
           <div className="flex flex-row gap-2 overflow-x-auto pb-1 w-full sm:grid sm:grid-cols-3 sm:gap-3 md:gap-4">
-            <Select defaultValue="sarangi">
+            <Select value={instrument} onValueChange={setInstrument}>
               <SelectTrigger className="rounded-lg min-w-[120px] sm:min-w-0">
-                <SelectValue placeholder="Sarangi" />
+                <SelectValue placeholder="Instrument" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="sarangi">Sarangi</SelectItem>
@@ -523,9 +630,9 @@ export default function PracticeToolsPage() {
               </SelectContent>
             </Select>
 
-            <Select defaultValue="roopak">
+            <Select value={taal} onValueChange={setTaal}>
               <SelectTrigger className="rounded-lg min-w-[120px] sm:min-w-0">
-                <SelectValue placeholder="Roopak (7)" />
+                <SelectValue placeholder="Taal" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="roopak">Roopak (7)</SelectItem>
@@ -534,14 +641,16 @@ export default function PracticeToolsPage() {
               </SelectContent>
             </Select>
 
-            <Select defaultValue="charukeshi">
+            <Select value={raag} onValueChange={setRaag}>
               <SelectTrigger className="rounded-lg min-w-[120px] sm:min-w-0">
-                <SelectValue placeholder="Charukeshi" />
+                <SelectValue placeholder="Raag" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="charukeshi">Charukeshi</SelectItem>
-                <SelectItem value="bhairav">Bhairav</SelectItem>
-                <SelectItem value="yaman">Yaman</SelectItem>
+                {raagOptions.map((r: string) => (
+                  <SelectItem key={r} value={r}>
+                    {r.charAt(0).toUpperCase() + r.slice(1)}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

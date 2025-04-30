@@ -1,5 +1,5 @@
-import { pipeline, Pipeline, Tensor, FeatureExtractionPipeline } from '@xenova/transformers';
-import { knowledgeBase, KnowledgeBaseEntry } from './ai-knowledge-base';
+import { pipeline, Tensor, FeatureExtractionPipeline } from '@xenova/transformers';
+import { knowledgeBase } from './ai-knowledge-base';
 
 // Define interfaces for clarity
 interface EmbeddingEntry {
