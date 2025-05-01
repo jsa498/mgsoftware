@@ -699,7 +699,7 @@ export async function clearGroupAttendance(groupId: string, month: Date): Promis
  * Optimized function to fetch practice leaderboard data in a more efficient way
  * Reduces multiple API calls to just a few batch operations
  */
-export async function getOptimizedPracticeLeaderboard() {
+export async function getOptimizedPracticeLeaderboard(endDate?: string) {
   try {
     // Get all active students in a single query
     const { data: students, error: studentsError } = await supabase
@@ -714,12 +714,21 @@ export async function getOptimizedPracticeLeaderboard() {
     // Extract all student IDs
     const studentIds = students.map(student => student.id);
     
-    // Get all practice sessions for these students in a single query
-    const { data: allPracticeSessions, error: sessionsError } = await supabase
+    // Base query for practice sessions
+    let practiceSessionsQuery = supabase
       .from('practice_sessions')
-      .select('student_id, duration_minutes, points')
+      .select('student_id, duration_minutes, points, completed_at') // Ensure completed_at is selected
       .in('student_id', studentIds)
       .eq('status', 'completed');
+
+    // Add end date filter if provided
+    if (endDate) {
+      // Filter sessions completed on or before the end of the specified date
+      practiceSessionsQuery = practiceSessionsQuery.lte('completed_at', endDate);
+    }
+
+    // Get all practice sessions for these students based on the query
+    const { data: allPracticeSessions, error: sessionsError } = await practiceSessionsQuery;
     
     if (sessionsError) throw sessionsError;
     
@@ -794,7 +803,7 @@ export async function getOptimizedPracticeLeaderboard() {
  * Optimized function to fetch quiz leaderboard data in a more efficient way
  * Reduces multiple API calls to just a few batch operations
  */
-export async function getOptimizedQuizLeaderboard() {
+export async function getOptimizedQuizLeaderboard(endDate?: string) {
   try {
     // Get all active students in a single query
     const { data: students, error: studentsError } = await supabase
@@ -809,12 +818,22 @@ export async function getOptimizedQuizLeaderboard() {
     // Extract all student IDs
     const studentIds = students.map(student => student.id);
     
-    // Get all quiz results for these students in a single query
-    const { data: allQuizResults, error: quizError } = await supabase
+    // Base query for quiz results
+    let quizResultsQuery = supabase
       .from('quiz_results')
-      .select('student_id, score')
+      .select('student_id, score, created_at') // Ensure created_at is selected
       .in('student_id', studentIds);
+
+    // Add end date filter if provided
+    if (endDate) {
+      // Assuming created_at marks the completion time for the quiz result
+      // Filter results created on or before the end of the specified date
+      quizResultsQuery = quizResultsQuery.lte('created_at', endDate);
+    }
     
+    // Get all quiz results for these students based on the query
+    const { data: allQuizResults, error: quizError } = await quizResultsQuery;
+
     if (quizError) throw quizError;
     
     // Group quiz results by student ID
@@ -2160,18 +2179,18 @@ export async function searchStudents(searchQuery: string): Promise<{
  * Fetches practice leaderboard data
  * Returns students sorted by practice points in descending order
  */
-export async function getPracticeLeaderboard() {
+export async function getPracticeLeaderboard(endDate?: string) {
   // Use the optimized version for better performance
-  return getOptimizedPracticeLeaderboard();
+  return getOptimizedPracticeLeaderboard(endDate);
 }
 
 /**
  * Fetches quiz leaderboard data
  * Returns students sorted by quiz points in descending order
  */
-export async function getQuizLeaderboard() {
+export async function getQuizLeaderboard(endDate?: string) {
   // Use the optimized version for better performance
-  return getOptimizedQuizLeaderboard();
+  return getOptimizedQuizLeaderboard(endDate);
 }
 
 /**

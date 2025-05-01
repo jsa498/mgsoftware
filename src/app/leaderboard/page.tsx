@@ -11,6 +11,7 @@ import {
   RotateCcw,
   Clock,
   Calendar,
+  X,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,7 @@ import {
 } from "@/components/ui/dialog";
 import { supabase } from "@/lib/supabase";
 import { formatDateTimeWithTimezone } from "@/lib/date-utils";
+import { DatePicker } from "@/components/ui/date-picker";
 
 // Define timezone constant but don't export it
 const timeZone = 'America/Vancouver'; // Default to Vancouver timezone
@@ -90,7 +92,10 @@ export default function Leaderboard() {
   const [historyPeriod, setHistoryPeriod] = useState<'day' | 'week' | 'month' | 'all'>('all');
   const [loadingHistory, setLoadingHistory] = useState(false);
   
-  // Fetch leaderboard data on component mount
+  // --> New state for leaderboard date filter
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  
+  // Fetch leaderboard data on component mount and when selectedDate changes
   useEffect(() => {
     fetchLeaderboardData();
     // Check if the current user is an admin
@@ -109,7 +114,7 @@ export default function Leaderboard() {
       
       return () => clearInterval(intervalId);
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedDate]); // <-- Add selectedDate as a dependency
   
   // Function to fetch active practicing sessions
   const fetchActivePracticingSessions = async () => {
@@ -127,8 +132,18 @@ export default function Leaderboard() {
   const fetchLeaderboardData = async () => {
     setLoading(true);
     try {
-      const practiceLeaderboard = await getPracticeLeaderboard();
-      const quizLeaderboard = await getQuizLeaderboard();
+      // --- Calculate end date for filtering ---
+      let filterEndDate: string | undefined = undefined;
+      if (selectedDate) {
+        // Get the end of the selected day in UTC
+        const endOfDay = new Date(selectedDate);
+        endOfDay.setHours(23, 59, 59, 999); // Set to end of the local day
+        filterEndDate = endOfDay.toISOString(); // Convert to UTC ISO string for Supabase
+      }
+      // --- End Calculate end date ---
+
+      const practiceLeaderboard = await getPracticeLeaderboard(filterEndDate);
+      const quizLeaderboard = await getQuizLeaderboard(filterEndDate);
       
       setPracticeData(practiceLeaderboard);
       setQuizData(quizLeaderboard);
@@ -147,6 +162,11 @@ export default function Leaderboard() {
     } finally {
       setLoading(false);
     }
+  };
+  
+  // --> New function to handle date reset
+  const handleDateReset = () => {
+    setSelectedDate(undefined); // Clears the date, useEffect will trigger refetch
   };
   
   // Function to update quiz points
@@ -374,6 +394,22 @@ export default function Leaderboard() {
                 <RotateCcw className="h-4 w-4 md:hidden" />
               </Button>
             </>
+          )}
+          {/* Date filter picker */}
+          <DatePicker
+            date={selectedDate}
+            setDate={setSelectedDate}
+            placeholder="View Past Leaderboard..."
+          />
+          {selectedDate && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleDateReset}
+              title="Reset to All Time"
+            >
+              <X className="h-4 w-4" />
+            </Button>
           )}
         </div>
       </div>
