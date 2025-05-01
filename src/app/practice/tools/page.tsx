@@ -39,6 +39,7 @@ import { getCurrentUser } from "@/lib/auth"
 import { getStudentProfileByUserId } from "@/lib/data-service"
 import { InstrumentVerificationDialog } from "@/components/InstrumentVerificationDialog"
 import { supabase } from "@/lib/supabase"
+import { Howl } from "howler"
 
 const notes = ["A", "A#", "B", "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#"]
 
@@ -94,6 +95,9 @@ export default function PracticeToolsPage() {
   // Add instrument, taal, and raag state with dynamic raag options
   const [instrument, setInstrument] = useState("sitar")
   const [taal, setTaal] = useState("teental")
+  const matraCountMap = useMemo<Record<string, number>>(() => ({ roopak: 7, teental: 16, dadra: 6 }), [])
+  const matraCount = matraCountMap[taal] || 16
+  const [currentMatra, setCurrentMatra] = useState(1)
   const raagOptions: string[] = useMemo<string[]>(() => {
     if (instrument === "sitar" && taal === "teental") {
       return ["bhimpalasi"]
@@ -101,7 +105,7 @@ export default function PracticeToolsPage() {
     return ["charukeshi", "bhairav", "yaman"]
   }, [instrument, taal])
   const [raag, setRaag] = useState<string>(raagOptions[0])
-  const lehraAudioRef = useRef<HTMLAudioElement | null>(null)
+  const lehraHowlRef = useRef<Howl | null>(null)
   
   const { toast } = useToast()
   
@@ -218,40 +222,76 @@ export default function PracticeToolsPage() {
     })
   }, [])
 
-  // Preload Lehra audio when instrument, taal, or raag changes
+  // Preload Lehra audio via Howler when instrument, taal, raag, or tonic note changes
   useEffect(() => {
-    // Normalize naming for stored files
+    // Preserve previous playback position
+    const prevHowl = lehraHowlRef.current
+    const prevPos = prevHowl ? (prevHowl.seek() as number) : 0
     const taalSpelling = taal === "teental" ? "teentaal" : taal
-    const fileName = `${instrument}_${taalSpelling}_${raag}.mp3`
-    const { data } = supabase.storage.from('instrument-audio').getPublicUrl(fileName)
+    const instrumentFolder = `lehra_${instrument}`
+    // Normalize sharp notes to match file naming (_sharp)
+    const normalizedNote = currentNote.includes('#') ? currentNote.replace('#', '_sharp') : currentNote
+    const fileName = `${raag}_${normalizedNote}.wav`
+    const filePath = `${instrumentFolder}/${taalSpelling}/${fileName}`
+    const { data } = supabase.storage.from('instrument-audio').getPublicUrl(filePath)
     const url = data?.publicUrl
     if (url) {
-      // Stop previous Lehra if any
-      if (lehraAudioRef.current) {
-        lehraAudioRef.current.pause()
+      if (prevHowl) {
+        prevHowl.unload()
       }
-      const audio = new Audio(url)
-      audio.loop = true
-      audio.preload = 'auto'
-      audio.volume = volumes.lehra / 100
-      audio.load()
-      lehraAudioRef.current = audio
+      const newHowl = new Howl({
+        src: [url],
+        loop: true,
+        volume: volumes.lehra / 100,
+      })
+      lehraHowlRef.current = newHowl
+      // Seamlessly resume playback if already playing
+      if (isAudioPlaying) {
+        newHowl.once('load', () => {
+          const duration = newHowl.duration()
+          const seekPos = prevPos % duration
+          newHowl.seek(seekPos)
+          newHowl.play()
+        })
+      }
     } else {
-      console.error(`Could not preload Lehra audio for ${fileName}`)
+      console.error(`Could not preload Lehra audio for ${filePath}`)
     }
-  }, [instrument, taal, raag, volumes.lehra])
+  }, [instrument, taal, raag, currentNote, isAudioPlaying])
 
-  // Control Lehra playback when play state or volume changes
+  // Control Lehra playback (play/pause and volume)
   useEffect(() => {
-    const audio = lehraAudioRef.current
-    if (!audio) return
-    audio.volume = volumes.lehra / 100
+    const howl = lehraHowlRef.current
+    if (!howl) return
+    howl.volume(volumes.lehra / 100)
     if (isAudioPlaying) {
-      audio.play().catch(e => console.error('Error playing Lehra audio:', e))
+      howl.play()
     } else {
-      audio.pause()
+      howl.pause()
     }
   }, [isAudioPlaying, volumes.lehra])
+
+  // Track and display current matra (beat) within the cycle
+  useEffect(() => {
+    let rafId: number
+    const updateBeat = () => {
+      const howl = lehraHowlRef.current
+      if (howl && isAudioPlaying) {
+        const pos = howl.seek() as number
+        const cycleSec = (matraCount / bpm) * 60
+        const posInCycle = pos % cycleSec
+        const beat = Math.floor((posInCycle / cycleSec) * matraCount) + 1
+        setCurrentMatra(beat)
+        rafId = requestAnimationFrame(updateBeat)
+      }
+    }
+    if (isAudioPlaying) {
+      rafId = requestAnimationFrame(updateBeat)
+    }
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId)
+    }
+  }, [isAudioPlaying, bpm, matraCount])
 
   // Control Tanpura audio playback when note, play state, or volume changes
   useEffect(() => {
@@ -610,10 +650,16 @@ export default function PracticeToolsPage() {
           </div>
 
           {/* BPM and Matra Display */}
-          <div className="flex items-center justify-center gap-4 max-w-[220px] mx-auto">
+          <div className="flex items-center justify-center gap-4 max-w-[340px] mx-auto">
+            {/* BPM */}
             <div className="text-center py-2 px-5 rounded-full bg-background/5 border border-border/50 shadow-sm">
               <div className="text-3xl font-medium tracking-tight">{bpm}</div>
               <div className="text-xs uppercase tracking-widest mt-0.5 text-muted-foreground">BPM</div>
+            </div>
+            {/* Matra */}
+            <div className="text-center py-2 px-5 rounded-full bg-background/5 border border-border/50 shadow-sm">
+              <div className="text-3xl font-medium tracking-tight">{currentMatra}</div>
+              <div className="text-xs uppercase tracking-widest mt-0.5 text-muted-foreground">Matra</div>
             </div>
           </div>
 
