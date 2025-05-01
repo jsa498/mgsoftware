@@ -213,7 +213,6 @@ export default function PracticeToolsPage() {
         const audio = new Audio(url)
         audio.loop = true
         audio.preload = 'auto'
-        audio.volume = volumes.tanpura / 100
         audio.load()
         noteAudioRefs.current[note] = audio
       } else {
@@ -257,7 +256,7 @@ export default function PracticeToolsPage() {
     } else {
       console.error(`Could not preload Lehra audio for ${filePath}`)
     }
-  }, [instrument, taal, raag, currentNote, isAudioPlaying])
+  }, [instrument, taal, raag, currentNote, isAudioPlaying, volumes.lehra])
 
   // Control Lehra playback (play/pause and volume)
   useEffect(() => {
@@ -498,7 +497,7 @@ export default function PracticeToolsPage() {
     if (!raagOptions.includes(raag)) {
       setRaag(raagOptions[0])
     }
-  }, [raagOptions])
+  }, [raagOptions, raag])
 
   return (
     <TooltipProvider>

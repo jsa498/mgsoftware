@@ -698,8 +698,10 @@ export async function clearGroupAttendance(groupId: string, month: Date): Promis
 /**
  * Optimized function to fetch practice leaderboard data in a more efficient way
  * Reduces multiple API calls to just a few batch operations
+ * @param startDate ISO string to include sessions completed on or after this date
+ * @param endDate ISO string to include sessions completed on or before this date
  */
-export async function getOptimizedPracticeLeaderboard(endDate?: string) {
+export async function getOptimizedPracticeLeaderboard(startDate?: string, endDate?: string) {
   try {
     // Get all active students in a single query
     const { data: students, error: studentsError } = await supabase
@@ -721,6 +723,10 @@ export async function getOptimizedPracticeLeaderboard(endDate?: string) {
       .in('student_id', studentIds)
       .eq('status', 'completed');
 
+    // Apply start date filter if provided (>= startDate)
+    if (startDate) {
+      practiceSessionsQuery = practiceSessionsQuery.gte('completed_at', startDate);
+    }
     // Add end date filter if provided
     if (endDate) {
       // Filter sessions completed on or before the end of the specified date
@@ -2176,12 +2182,12 @@ export async function searchStudents(searchQuery: string): Promise<{
 }
 
 /**
- * Fetches practice leaderboard data
+ * Fetches practice leaderboard data for a given date range
  * Returns students sorted by practice points in descending order
  */
-export async function getPracticeLeaderboard(endDate?: string) {
+export async function getPracticeLeaderboard(startDate?: string, endDate?: string) {
   // Use the optimized version for better performance
-  return getOptimizedPracticeLeaderboard(endDate);
+  return getOptimizedPracticeLeaderboard(startDate, endDate);
 }
 
 /**
@@ -2216,8 +2222,15 @@ export async function getActivePracticingSessions(): Promise<string[]> {
 
 /**
  * Fetches detailed practice history for a specific student
+ * @param studentId The ID of the student
+ * @param period 'day' | 'week' | 'month' | 'all' to filter sessions
+ * @param referenceDate ISO string for base date (defaults to current date if not provided)
  */
-export async function getStudentPracticeHistory(studentId: string, period: 'day' | 'week' | 'month' | 'all' = 'all') {
+export async function getStudentPracticeHistory(
+  studentId: string,
+  period: 'day' | 'week' | 'month' | 'all' = 'all',
+  referenceDate?: string
+) {
   try {
     let query = supabase
       .from('practice_sessions')
@@ -2226,18 +2239,21 @@ export async function getStudentPracticeHistory(studentId: string, period: 'day'
       .eq('status', 'completed')
       .order('started_at', { ascending: false });
     
-    // Apply time filter
-    const now = new Date();
+    // Apply time filter based on referenceDate (default to now)
+    const now = referenceDate ? new Date(referenceDate) : new Date();
     
     if (period === 'day') {
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      query = query.gte('started_at', today.toISOString());
+      // Filter sessions from start of reference day
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      query = query.gte('started_at', startOfDay.toISOString());
     } else if (period === 'week') {
+      // Filter sessions from start of the week containing reference date
       const weekStart = new Date(now);
       weekStart.setDate(now.getDate() - now.getDay());
       weekStart.setHours(0, 0, 0, 0);
       query = query.gte('started_at', weekStart.toISOString());
     } else if (period === 'month') {
+      // Filter sessions from start of the month containing reference date
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
       query = query.gte('started_at', monthStart.toISOString());
     }

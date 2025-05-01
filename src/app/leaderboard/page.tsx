@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Trophy,
   Search,
@@ -8,10 +8,8 @@ import {
   Plus,
   Minus,
   BarChart2,
-  RotateCcw,
   Clock,
   Calendar,
-  X,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -93,7 +91,62 @@ export default function Leaderboard() {
   const [loadingHistory, setLoadingHistory] = useState(false);
   
   // --> New state for leaderboard date filter
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  // Initialize to today so the leaderboard defaults to current day
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+
+  // Function to fetch active practicing sessions
+  const fetchActivePracticingSessions = useCallback(async () => {
+    if (!isAdmin()) return;
+    
+    try {
+      const activeSessions = await getActivePracticingSessions();
+      setActivePracticingSessions(activeSessions);
+    } catch (error) {
+      console.error("Error fetching active practice sessions:", error);
+    }
+  }, []);
+  
+  // Function to fetch leaderboard data
+  const fetchLeaderboardData = useCallback(async () => {
+    setLoading(true);
+    try {
+      // --- Calculate date range for monthly leaderboard filter ---
+      let filterStartDate: string | undefined = undefined;
+      let filterEndDate: string | undefined = undefined;
+      if (selectedDate) {
+        // Start at first day of selected month at local midnight
+        const startOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+        startOfMonth.setHours(0, 0, 0, 0);
+        filterStartDate = startOfMonth.toISOString();
+        // End at end of selected day in UTC
+        const endOfDay = new Date(selectedDate);
+        endOfDay.setHours(23, 59, 59, 999);
+        filterEndDate = endOfDay.toISOString();
+      }
+      // --- End Calculate date range ---
+
+      // Fetch practice leaderboard for the month-to-date (or specific date)
+      const practiceLeaderboard = await getPracticeLeaderboard(filterStartDate, filterEndDate);
+      const quizLeaderboard = await getQuizLeaderboard(filterEndDate);
+      
+      setPracticeData(practiceLeaderboard);
+      setQuizData(quizLeaderboard);
+      
+      // Also update active practice sessions
+      if (isAdmin()) {
+        fetchActivePracticingSessions();
+      }
+    } catch (error) {
+      console.error("Error fetching leaderboard data:", error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch leaderboard data. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedDate, fetchActivePracticingSessions]);
   
   // Fetch leaderboard data on component mount and when selectedDate changes
   useEffect(() => {
@@ -114,60 +167,7 @@ export default function Leaderboard() {
       
       return () => clearInterval(intervalId);
     }
-  }, [selectedDate]); // <-- Add selectedDate as a dependency
-  
-  // Function to fetch active practicing sessions
-  const fetchActivePracticingSessions = async () => {
-    if (!isAdmin()) return;
-    
-    try {
-      const activeSessions = await getActivePracticingSessions();
-      setActivePracticingSessions(activeSessions);
-    } catch (error) {
-      console.error("Error fetching active practice sessions:", error);
-    }
-  };
-  
-  // Function to fetch leaderboard data
-  const fetchLeaderboardData = async () => {
-    setLoading(true);
-    try {
-      // --- Calculate end date for filtering ---
-      let filterEndDate: string | undefined = undefined;
-      if (selectedDate) {
-        // Get the end of the selected day in UTC
-        const endOfDay = new Date(selectedDate);
-        endOfDay.setHours(23, 59, 59, 999); // Set to end of the local day
-        filterEndDate = endOfDay.toISOString(); // Convert to UTC ISO string for Supabase
-      }
-      // --- End Calculate end date ---
-
-      const practiceLeaderboard = await getPracticeLeaderboard(filterEndDate);
-      const quizLeaderboard = await getQuizLeaderboard(filterEndDate);
-      
-      setPracticeData(practiceLeaderboard);
-      setQuizData(quizLeaderboard);
-      
-      // Also update active practice sessions
-      if (isAdmin()) {
-        fetchActivePracticingSessions();
-      }
-    } catch (error) {
-      console.error("Error fetching leaderboard data:", error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch leaderboard data. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  // --> New function to handle date reset
-  const handleDateReset = () => {
-    setSelectedDate(undefined); // Clears the date, useEffect will trigger refetch
-  };
+  }, [fetchLeaderboardData, fetchActivePracticingSessions]);
   
   // Function to update quiz points
   const handleUpdateQuizPoints = async (studentId: string, increment: number) => {
@@ -192,17 +192,6 @@ export default function Leaderboard() {
         variant: "destructive",
       });
     }
-  };
-  
-  // Function to handle reset all points and time
-  const handleResetAll = async () => {
-    // This would need to be implemented on the server/database side
-    // For now, just show a toast message
-    toast({
-      title: "Reset not implemented",
-      description: "This functionality has not been implemented yet.",
-      variant: "destructive",
-    });
   };
   
   // Function to handle calibrate points
@@ -304,13 +293,15 @@ export default function Leaderboard() {
     fetchPracticeHistory(studentId, historyPeriod);
   };
   
-  // Function to fetch practice history
+  // Function to fetch practice history (uses selectedDate as reference)
   const fetchPracticeHistory = async (studentId: string, period: 'day' | 'week' | 'month' | 'all') => {
     if (!studentId) return;
     
     setLoadingHistory(true);
     try {
-      const history = await getStudentPracticeHistory(studentId, period);
+      // Pass selectedDate as referenceDate to the service
+      const referenceIso = selectedDate?.toISOString();
+      const history = await getStudentPracticeHistory(studentId, period, referenceIso);
       setPracticeHistory(history);
     } catch (error) {
       console.error("Error fetching practice history:", error);
@@ -389,28 +380,13 @@ export default function Leaderboard() {
                 <span className="hidden md:inline">Calibrate Points</span>
                 <BarChart2 className="h-4 w-4 md:hidden" />
               </Button>
-              <Button variant="destructive" onClick={handleResetAll} aria-label="Reset All Points & Time">
-                <span className="hidden md:inline">Reset All Points & Time</span>
-                <RotateCcw className="h-4 w-4 md:hidden" />
-              </Button>
             </>
           )}
           {/* Date filter picker */}
           <DatePicker
             date={selectedDate}
             setDate={setSelectedDate}
-            placeholder="View Past Leaderboard..."
           />
-          {selectedDate && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleDateReset}
-              title="Reset to All Time"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          )}
         </div>
       </div>
 

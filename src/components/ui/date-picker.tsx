@@ -16,7 +16,6 @@ import {
 interface DatePickerProps {
   date: Date | undefined
   setDate: (date: Date | undefined) => void
-  buttonText?: string
   buttonVariant?: "default" | "outline" | "secondary" | "ghost" | "link" | "destructive"
   placeholder?: string
   className?: string
@@ -25,7 +24,6 @@ interface DatePickerProps {
 export function DatePicker({
   date,
   setDate,
-  buttonText = "Pick a date",
   buttonVariant = "outline",
   placeholder = "Select date...",
   className,
