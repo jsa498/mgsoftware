@@ -50,6 +50,7 @@ interface AiHistoryMessage {
   id: number;
   session_id: string;
   student_id: string;
+  user_id: number;
   sender: 'user' | 'ai';
   message: string;
   inserted_at: string;
@@ -58,6 +59,7 @@ interface AiHistoryMessage {
 interface SessionItem {
   sessionId: string;
   studentId: string;
+  ownerUserId: number;
   preview: string;
   timestamp: string;
 }
@@ -67,8 +69,9 @@ export default function AiAssistantPage() {
   const [inputValue, setInputValue] = useState<string>('');
   // Add a loading state for the AI response
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const user = getCurrentUser();
-  const username = user?.username || '';
+  const currentUser = getCurrentUser();
+  const currentUserId = currentUser?.id;
+  const username = currentUser?.username || '';
   const [fullName, setFullName] = useState<string>('');
   const displayName = fullName || username;
   // Prevent hydration mismatch: only show user-specific content after mount
@@ -84,8 +87,23 @@ export default function AiAssistantPage() {
   const [isAdminUser, setIsAdminUser] = useState<boolean>(false);
   const [isMobile, setIsMobile] = useState<boolean>(false);
 
-  const currentUser = getCurrentUser();
   const currentStudentId = currentUser?.student_id ?? '';
+
+  // Derive grouping for My Chats and Student Chats
+  const groupedMine: Record<string, SessionItem[]> = {};
+  sessionsMine.forEach((s) => {
+    const dateKey = new Date(s.timestamp).toLocaleDateString();
+    if (!groupedMine[dateKey]) groupedMine[dateKey] = [];
+    groupedMine[dateKey].push(s);
+  });
+  // Only sessions started by students
+  const studentSessions = sessionsAll.filter((s) => s.ownerUserId !== currentUserId);
+  const groupedStudents: Record<string, SessionItem[]> = {};
+  studentSessions.forEach((s) => {
+    const dateKey = new Date(s.timestamp).toLocaleDateString();
+    if (!groupedStudents[dateKey]) groupedStudents[dateKey] = [];
+    groupedStudents[dateKey].push(s);
+  });
 
   // Add auto-scroll to bottom on new messages
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -98,8 +116,8 @@ export default function AiAssistantPage() {
 
   // On mount, fetch the student's full name
   useEffect(() => {
-    if (user?.id) {
-      getStudentProfileByUserId(user.id)
+    if (currentUser?.id) {
+      getStudentProfileByUserId(currentUser.id)
         .then((profile) => {
           if (profile && profile.first_name && profile.last_name) {
             setFullName(`${profile.first_name} ${profile.last_name}`);
@@ -107,7 +125,7 @@ export default function AiAssistantPage() {
         })
         .catch(console.error);
     }
-  }, [user]);
+  }, [currentUser]);
 
   useEffect(() => {
     setIsMounted(true);
@@ -139,25 +157,45 @@ export default function AiAssistantPage() {
 
   // Fetch history when opened
   useEffect(() => {
+    // Only fetch when history is opened
     if (!historyOpen) return;
-    fetch('/api/ai/history')
-      .then((res) => res.json())
-      .then((data) => {
+    (async () => {
+      try {
+        const res = await fetch('/api/ai/history', { credentials: 'include' });
+        const data = await res.json();
         const msgs: AiHistoryMessage[] = data.messages || [];
         setHistoryMessages(msgs);
+        // Group by session
         const grouped: Record<string, AiHistoryMessage[]> = {};
-        msgs.forEach((m) => { grouped[m.session_id] = grouped[m.session_id] || []; grouped[m.session_id].push(m); });
+        msgs.forEach((m) => {
+          grouped[m.session_id] = grouped[m.session_id] || [];
+          grouped[m.session_id].push(m);
+        });
         const items: SessionItem[] = Object.entries(grouped).map(([sid, ms]) => {
           ms.sort((a, b) => new Date(a.inserted_at).getTime() - new Date(b.inserted_at).getTime());
           const firstMsg = ms.find((m) => m.sender === 'user') || ms[0];
-          return { sessionId: sid, studentId: firstMsg.student_id, preview: firstMsg.message.slice(0,50), timestamp: ms[0].inserted_at };
+          return {
+            sessionId: sid,
+            studentId: firstMsg.student_id,
+            ownerUserId: firstMsg.user_id,
+            preview: firstMsg.message.slice(0, 50),
+            timestamp: ms[0].inserted_at,
+          };
         });
         items.sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
         setSessionsAll(items);
-        setSessionsMine(items.filter((s) => s.studentId === currentStudentId));
-      })
-      .catch(console.error);
-  }, [historyOpen, currentStudentId]);
+        setSessionsMine(
+          items.filter((s) =>
+            isAdminUser
+              ? s.ownerUserId === currentUserId
+              : s.studentId === currentStudentId
+          )
+        );
+      } catch (err) {
+        console.error('Error fetching AI history:', err);
+      }
+    })();
+  }, [historyOpen, currentStudentId, currentUserId, isAdminUser]);
 
   // Handlers for new chat and resume
   const resumeSession = (sid: string) => {
@@ -211,12 +249,11 @@ export default function AiAssistantPage() {
     }
 
     try {
-      // Call the backend API route
+      // Send cookies so server knows which user is sending
       const response = await fetch('/api/ai/chat', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: messageText, sessionId }),
       });
 
@@ -298,34 +335,48 @@ export default function AiAssistantPage() {
                     {isAdminUser && <TabsTrigger value="students">Student Chats</TabsTrigger>}
                   </TabsList>
                   <TabsContent value="my">
-                    {sessionsMine.length === 0 ? (
+                    {Object.keys(groupedMine).length === 0 ? (
                       <p className="text-sm text-muted-foreground">No past chats.</p>
                     ) : (
-                      <div className="space-y-2">
-                        {sessionsMine.map((s) => (
-                          <Button key={s.sessionId} variant="outline" className="w-full text-left" onClick={() => resumeSession(s.sessionId)}>
-                            <div className="flex justify-between">
-                              <span>{new Date(s.timestamp).toLocaleString()}</span>
-                              <span className="font-medium">{s.preview}</span>
+                      <div className="space-y-4">
+                        {Object.entries(groupedMine).map(([date, sessions]) => (
+                          <div key={date}>
+                            <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">{date}</div>
+                            <div className="space-y-2">
+                              {sessions.map((s) => (
+                                <Button key={s.sessionId} variant="outline" className="w-full text-left" onClick={() => resumeSession(s.sessionId)}>
+                                  <div className="flex justify-between">
+                                    <span>{new Date(s.timestamp).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</span>
+                                    <span className="font-medium">{s.preview}</span>
+                                  </div>
+                                </Button>
+                              ))}
                             </div>
-                          </Button>
+                          </div>
                         ))}
                       </div>
                     )}
                   </TabsContent>
                   {isAdminUser && (
                     <TabsContent value="students">
-                      {sessionsAll.length === 0 ? (
+                      {Object.keys(groupedStudents).length === 0 ? (
                         <p className="text-sm text-muted-foreground">No chats available.</p>
                       ) : (
-                        <div className="space-y-2">
-                          {sessionsAll.map((s) => (
-                            <Button key={s.sessionId} variant="outline" className="w-full text-left" onClick={() => resumeSession(s.sessionId)}>
-                              <div className="flex justify-between">
-                                <span>{studentMap[s.studentId] || s.studentId} – {new Date(s.timestamp).toLocaleString()}</span>
-                                <span className="font-medium">{s.preview}</span>
+                        <div className="space-y-4">
+                          {Object.entries(groupedStudents).map(([date, sessions]) => (
+                            <div key={date}>
+                              <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">{date}</div>
+                              <div className="space-y-2">
+                                {sessions.map((s) => (
+                                  <Button key={s.sessionId} variant="outline" className="w-full text-left" onClick={() => resumeSession(s.sessionId)}>
+                                    <div className="flex justify-between">
+                                      <span>{studentMap[s.studentId] || s.studentId} – {new Date(s.timestamp).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</span>
+                                      <span className="font-medium">{s.preview}</span>
+                                    </div>
+                                  </Button>
+                                ))}
                               </div>
-                            </Button>
+                            </div>
                           ))}
                         </div>
                       )}
@@ -355,34 +406,48 @@ export default function AiAssistantPage() {
                     {isAdminUser && <TabsTrigger value="students">Student Chats</TabsTrigger>}
                   </TabsList>
                   <TabsContent value="my">
-                    {sessionsMine.length === 0 ? (
+                    {Object.keys(groupedMine).length === 0 ? (
                       <p className="text-sm text-muted-foreground">No past chats.</p>
                     ) : (
-                      <div className="space-y-2">
-                        {sessionsMine.map((s) => (
-                          <Button key={s.sessionId} variant="outline" className="w-full text-left" onClick={() => resumeSession(s.sessionId)}>
-                            <div className="flex justify-between">
-                              <span>{new Date(s.timestamp).toLocaleString()}</span>
-                              <span className="font-medium">{s.preview}</span>
+                      <div className="space-y-4">
+                        {Object.entries(groupedMine).map(([date, sessions]) => (
+                          <div key={date}>
+                            <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">{date}</div>
+                            <div className="space-y-2">
+                              {sessions.map((s) => (
+                                <Button key={s.sessionId} variant="outline" className="w-full text-left" onClick={() => resumeSession(s.sessionId)}>
+                                  <div className="flex justify-between">
+                                    <span>{new Date(s.timestamp).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</span>
+                                    <span className="font-medium">{s.preview}</span>
+                                  </div>
+                                </Button>
+                              ))}
                             </div>
-                          </Button>
+                          </div>
                         ))}
                       </div>
                     )}
                   </TabsContent>
                   {isAdminUser && (
                     <TabsContent value="students">
-                      {sessionsAll.length === 0 ? (
+                      {Object.keys(groupedStudents).length === 0 ? (
                         <p className="text-sm text-muted-foreground">No chats available.</p>
                       ) : (
-                        <div className="space-y-2">
-                          {sessionsAll.map((s) => (
-                            <Button key={s.sessionId} variant="outline" className="w-full text-left" onClick={() => resumeSession(s.sessionId)}>
-                              <div className="flex justify-between">
-                                <span>{studentMap[s.studentId] || s.studentId} – {new Date(s.timestamp).toLocaleString()}</span>
-                                <span className="font-medium">{s.preview}</span>
+                        <div className="space-y-4">
+                          {Object.entries(groupedStudents).map(([date, sessions]) => (
+                            <div key={date}>
+                              <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">{date}</div>
+                              <div className="space-y-2">
+                                {sessions.map((s) => (
+                                  <Button key={s.sessionId} variant="outline" className="w-full text-left" onClick={() => resumeSession(s.sessionId)}>
+                                    <div className="flex justify-between">
+                                      <span>{studentMap[s.studentId] || s.studentId} – {new Date(s.timestamp).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</span>
+                                      <span className="font-medium">{s.preview}</span>
+                                    </div>
+                                  </Button>
+                                ))}
                               </div>
-                            </Button>
+                            </div>
                           ))}
                         </div>
                       )}

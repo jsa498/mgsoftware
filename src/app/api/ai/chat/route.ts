@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { findBestKnowledgeMatch } from '@/lib/ai-utils'; // Corrected import path
 import { createClient } from '@supabase/supabase-js';
-import { getStudentId } from '@/lib/server-auth';
+import { getStudentId, getCurrentUserId } from '@/lib/server-auth';
 
 // Helper to normalize input and catch common misspellings
 function normalizeMessage(msg: string): string {
@@ -151,29 +151,35 @@ const supabaseAdmin = createClient(
 
 // Helper to log messages to supabase
 async function logMessage(
-  studentId: string,
+  userId: number,
+  studentId: string | null,
   sessionId: string,
   sender: 'user' | 'ai',
   messageText: string
 ) {
   const { error } = await supabaseAdmin
     .from('ai_messages')
-    .insert({ session_id: sessionId, student_id: studentId, sender, message: messageText });
+    .insert({
+      session_id: sessionId,
+      user_id: userId,
+      student_id: studentId,
+      sender,
+      message: messageText,
+    });
   if (error) console.error('[AI Chat] error logging message', error);
 }
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    // Extract user message and session ID from request
     const { message: userMessage, sessionId } = body;
-    // Determine current student's ID from cookie-based auth
     const studentId = await getStudentId();
-    if (!studentId) console.error('[AI Chat] studentId not found, history will not be recorded');
+    const userIdStr = await getCurrentUserId();
+    // Convert userId from string to number
+    const userId = userIdStr ? parseInt(userIdStr, 10) : null;
 
-    // Record the incoming user message
-    if (studentId && sessionId) {
-      await logMessage(studentId, sessionId, 'user', userMessage);
+    if (userId !== null && sessionId) {
+      await logMessage(userId, studentId, sessionId, 'user', userMessage);
     }
 
     console.log(`[AI Chat] 💬 Received user message: "${userMessage}"`);
@@ -190,8 +196,8 @@ export async function POST(req: NextRequest) {
         const reply = responses[Math.floor(Math.random() * responses.length)];
         console.log(`[AI Chat] 🎯 Custom rule matched (${rule.pattern}), responding: "${reply}"`);
         // Record AI reply
-        if (studentId && sessionId) {
-          await logMessage(studentId, sessionId, 'ai', reply);
+        if (userId !== null && sessionId) {
+          await logMessage(userId, studentId, sessionId, 'ai', reply);
         }
         return NextResponse.json({ response: reply });
       }
@@ -204,8 +210,8 @@ export async function POST(req: NextRequest) {
       const reply = greetingReplies[Math.floor(Math.random() * greetingReplies.length)];
       console.log(`[AI Chat] 🎉 Fuzzy greeting detected for "${firstToken}", replying: "${reply}"`);
       // Record AI reply
-      if (studentId && sessionId) {
-        await logMessage(studentId, sessionId, 'ai', reply);
+      if (userId !== null && sessionId) {
+        await logMessage(userId, studentId, sessionId, 'ai', reply);
       }
       return NextResponse.json({ response: reply });
     }
@@ -217,8 +223,8 @@ export async function POST(req: NextRequest) {
       const devflowReply = "DevFlow is a software company that works across many areas of software development.";
       console.log(`[AI Chat] 🔧 Fuzzy DevFlow detected in tokens [${tokens.join(', ')}], replying: "${devflowReply}"`);
       // Record AI reply
-      if (studentId && sessionId) {
-        await logMessage(studentId, sessionId, 'ai', devflowReply);
+      if (userId !== null && sessionId) {
+        await logMessage(userId, studentId, sessionId, 'ai', devflowReply);
       }
       return NextResponse.json({ response: devflowReply });
     }
@@ -244,8 +250,8 @@ export async function POST(req: NextRequest) {
           const mathResponse = `The result of ${expr.trim()} is ${result}.`;
           console.log(`[AI Chat]   ⇒ Responding with math result`);
           // Record AI math response
-          if (studentId && sessionId) {
-            await logMessage(studentId, sessionId, 'ai', mathResponse);
+          if (userId !== null && sessionId) {
+            await logMessage(userId, studentId, sessionId, 'ai', mathResponse);
           }
           return NextResponse.json({ response: mathResponse });
         } catch (error) {
@@ -269,8 +275,8 @@ export async function POST(req: NextRequest) {
       const reply = smartReplies[Math.floor(Math.random() * smartReplies.length)];
       console.log(`[AI Chat] 🤖 Smartness query matched, selected reply: "${reply}"`);
       // Record AI smartness reply
-      if (studentId && sessionId) {
-        await logMessage(studentId, sessionId, 'ai', reply);
+      if (userId !== null && sessionId) {
+        await logMessage(userId, studentId, sessionId, 'ai', reply);
       }
       return NextResponse.json({ response: reply });
     }
@@ -284,23 +290,23 @@ export async function POST(req: NextRequest) {
     if (aiResponse) {
       console.log(`[AI Chat] ✅ Sending knowledge base response`);
       // Record AI KB reply
-      if (studentId && sessionId) {
-        await logMessage(studentId, sessionId, 'ai', aiResponse);
+      if (userId !== null && sessionId) {
+        await logMessage(userId, studentId, sessionId, 'ai', aiResponse);
       }
       return NextResponse.json({ response: aiResponse });
     } else {
       console.log(`[AI Chat] ⚠️ No knowledge base match, sending fallback`);
       const fallbackResponse = "I'm sorry, I couldn't find specific information about that in my current knowledge base. I can answer questions about common MGS VIDYALA features.";
       // Record AI fallback reply
-      if (studentId && sessionId) {
-        await logMessage(studentId, sessionId, 'ai', fallbackResponse);
+      if (userId !== null && sessionId) {
+        await logMessage(userId, studentId, sessionId, 'ai', fallbackResponse);
       }
       return NextResponse.json({ response: fallbackResponse });
     }
 
   } catch (error) {
-    console.error(`[AI Chat] ❌ Error processing chat message:`, error);
-    // Don't expose detailed errors to the client
+    console.error('[AI Chat] ❌ Error processing chat message:', error);
+    // Return generic error to client
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
-} 
+}

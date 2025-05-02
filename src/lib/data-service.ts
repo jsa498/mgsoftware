@@ -1374,8 +1374,12 @@ export async function getStudentProfileByUserId(userId: number): Promise<Record<
       .eq('id', userId)
       .single();
 
-    if (userError || !userData?.student_id) {
-      console.error('Error getting student ID from user:', userError);
+    if (userError) {
+      console.error('Error fetching user data for student profile:', userError);
+      return null;
+    }
+    if (!userData?.student_id) {
+      // No student record => likely an admin user, not an error
       return null;
     }
 
