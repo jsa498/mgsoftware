@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { findBestKnowledgeMatch } from '@/lib/ai-utils'; // Corrected import path
+import { createClient } from '@supabase/supabase-js';
+import { getStudentId } from '@/lib/server-auth';
 
 // Helper to normalize input and catch common misspellings
 function normalizeMessage(msg: string): string {
@@ -141,11 +143,40 @@ const customRules: Array<{ pattern: RegExp; response: string | string[] }> = [
     ] },
 ];
 
+// Initialize Supabase Admin client for history logging
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+);
+
+// Helper to log messages to supabase
+async function logMessage(
+  studentId: string,
+  sessionId: string,
+  sender: 'user' | 'ai',
+  messageText: string
+) {
+  const { error } = await supabaseAdmin
+    .from('ai_messages')
+    .insert({ session_id: sessionId, student_id: studentId, sender, message: messageText });
+  if (error) console.error('[AI Chat] error logging message', error);
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    console.log(`[AI Chat] 💬 Received user message: "${body.message}"`);
-    const userMessage = body.message;
+    // Extract user message and session ID from request
+    const { message: userMessage, sessionId } = body;
+    // Determine current student's ID from cookie-based auth
+    const studentId = await getStudentId();
+    if (!studentId) console.error('[AI Chat] studentId not found, history will not be recorded');
+
+    // Record the incoming user message
+    if (studentId && sessionId) {
+      await logMessage(studentId, sessionId, 'user', userMessage);
+    }
+
+    console.log(`[AI Chat] 💬 Received user message: "${userMessage}"`);
 
     if (!userMessage || typeof userMessage !== 'string' || userMessage.trim().length === 0) {
       console.log(`[AI Chat] ⚠️ Invalid message format`);
@@ -158,6 +189,10 @@ export async function POST(req: NextRequest) {
         const responses = Array.isArray(rule.response) ? rule.response : [rule.response];
         const reply = responses[Math.floor(Math.random() * responses.length)];
         console.log(`[AI Chat] 🎯 Custom rule matched (${rule.pattern}), responding: "${reply}"`);
+        // Record AI reply
+        if (studentId && sessionId) {
+          await logMessage(studentId, sessionId, 'ai', reply);
+        }
         return NextResponse.json({ response: reply });
       }
     }
@@ -168,6 +203,10 @@ export async function POST(req: NextRequest) {
     if (isFuzzyGreeting(firstToken)) {
       const reply = greetingReplies[Math.floor(Math.random() * greetingReplies.length)];
       console.log(`[AI Chat] 🎉 Fuzzy greeting detected for "${firstToken}", replying: "${reply}"`);
+      // Record AI reply
+      if (studentId && sessionId) {
+        await logMessage(studentId, sessionId, 'ai', reply);
+      }
       return NextResponse.json({ response: reply });
     }
 
@@ -177,6 +216,10 @@ export async function POST(req: NextRequest) {
     if (hasDevflow) {
       const devflowReply = "DevFlow is a software company that works across many areas of software development.";
       console.log(`[AI Chat] 🔧 Fuzzy DevFlow detected in tokens [${tokens.join(', ')}], replying: "${devflowReply}"`);
+      // Record AI reply
+      if (studentId && sessionId) {
+        await logMessage(studentId, sessionId, 'ai', devflowReply);
+      }
       return NextResponse.json({ response: devflowReply });
     }
 
@@ -200,6 +243,10 @@ export async function POST(req: NextRequest) {
           console.log(`[AI Chat]   ⇒ Math result: ${result}`);
           const mathResponse = `The result of ${expr.trim()} is ${result}.`;
           console.log(`[AI Chat]   ⇒ Responding with math result`);
+          // Record AI math response
+          if (studentId && sessionId) {
+            await logMessage(studentId, sessionId, 'ai', mathResponse);
+          }
           return NextResponse.json({ response: mathResponse });
         } catch (error) {
           console.warn(`[AI Chat] ⚠️ Math evaluation error, falling back to knowledge base`, error);
@@ -221,6 +268,10 @@ export async function POST(req: NextRequest) {
     if (smartPatterns.some((p) => p.test(userMessage.trim()))) {
       const reply = smartReplies[Math.floor(Math.random() * smartReplies.length)];
       console.log(`[AI Chat] 🤖 Smartness query matched, selected reply: "${reply}"`);
+      // Record AI smartness reply
+      if (studentId && sessionId) {
+        await logMessage(studentId, sessionId, 'ai', reply);
+      }
       return NextResponse.json({ response: reply });
     }
 
@@ -232,10 +283,18 @@ export async function POST(req: NextRequest) {
 
     if (aiResponse) {
       console.log(`[AI Chat] ✅ Sending knowledge base response`);
+      // Record AI KB reply
+      if (studentId && sessionId) {
+        await logMessage(studentId, sessionId, 'ai', aiResponse);
+      }
       return NextResponse.json({ response: aiResponse });
     } else {
       console.log(`[AI Chat] ⚠️ No knowledge base match, sending fallback`);
       const fallbackResponse = "I'm sorry, I couldn't find specific information about that in my current knowledge base. I can answer questions about common MGS VIDYALA features.";
+      // Record AI fallback reply
+      if (studentId && sessionId) {
+        await logMessage(studentId, sessionId, 'ai', fallbackResponse);
+      }
       return NextResponse.json({ response: fallbackResponse });
     }
 

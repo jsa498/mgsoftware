@@ -10,12 +10,56 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { getCurrentUser } from '@/lib/auth';
 import { getStudentProfileByUserId } from '@/lib/data-service';
+import { v4 as uuidv4 } from 'uuid';
+import {
+  Dialog,
+  DialogTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogFooter,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from '@/components/ui/tabs';
+import {
+  Sheet,
+  SheetTrigger,
+  SheetContent,
+  SheetHeader,
+  SheetFooter,
+  SheetTitle,
+  SheetDescription,
+} from '@/components/ui/sheet';
+import { Clock, Plus } from 'lucide-react';
+import { getAllStudents } from '@/lib/data-service';
 
 // Define a type for the message structure
 interface Message {
   id: number;
   sender: 'user' | 'ai';
   text: string;
+}
+
+// Types for history
+interface AiHistoryMessage {
+  id: number;
+  session_id: string;
+  student_id: string;
+  sender: 'user' | 'ai';
+  message: string;
+  inserted_at: string;
+}
+
+interface SessionItem {
+  sessionId: string;
+  studentId: string;
+  preview: string;
+  timestamp: string;
 }
 
 export default function AiAssistantPage() {
@@ -29,6 +73,19 @@ export default function AiAssistantPage() {
   const displayName = fullName || username;
   // Prevent hydration mismatch: only show user-specific content after mount
   const [isMounted, setIsMounted] = useState(false);
+  const [sessionId, setSessionId] = useState(() => uuidv4());
+
+  // History state
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyMessages, setHistoryMessages] = useState<AiHistoryMessage[]>([]);
+  const [sessionsMine, setSessionsMine] = useState<SessionItem[]>([]);
+  const [sessionsAll, setSessionsAll] = useState<SessionItem[]>([]);
+  const [studentMap, setStudentMap] = useState<Record<string, string>>({});
+  const [isAdminUser, setIsAdminUser] = useState<boolean>(false);
+  const [isMobile, setIsMobile] = useState<boolean>(false);
+
+  const currentUser = getCurrentUser();
+  const currentStudentId = currentUser?.student_id ?? '';
 
   // Add auto-scroll to bottom on new messages
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -55,6 +112,68 @@ export default function AiAssistantPage() {
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  // Detect admin role
+  useEffect(() => {
+    setIsAdminUser(currentUser?.role === 'admin');
+  }, [currentUser]);
+
+  // Detect mobile for sheet
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
+  // Fetch students for admin map
+  useEffect(() => {
+    if (isAdminUser) {
+      getAllStudents().then((students) => {
+        const map: Record<string, string> = {};
+        students.forEach((s) => { map[s.id] = `${s.first_name} ${s.last_name}`; });
+        setStudentMap(map);
+      });
+    }
+  }, [isAdminUser]);
+
+  // Fetch history when opened
+  useEffect(() => {
+    if (!historyOpen) return;
+    fetch('/api/ai/history')
+      .then((res) => res.json())
+      .then((data) => {
+        const msgs: AiHistoryMessage[] = data.messages || [];
+        setHistoryMessages(msgs);
+        const grouped: Record<string, AiHistoryMessage[]> = {};
+        msgs.forEach((m) => { grouped[m.session_id] = grouped[m.session_id] || []; grouped[m.session_id].push(m); });
+        const items: SessionItem[] = Object.entries(grouped).map(([sid, ms]) => {
+          ms.sort((a, b) => new Date(a.inserted_at).getTime() - new Date(b.inserted_at).getTime());
+          const firstMsg = ms.find((m) => m.sender === 'user') || ms[0];
+          return { sessionId: sid, studentId: firstMsg.student_id, preview: firstMsg.message.slice(0,50), timestamp: ms[0].inserted_at };
+        });
+        items.sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        setSessionsAll(items);
+        setSessionsMine(items.filter((s) => s.studentId === currentStudentId));
+      })
+      .catch(console.error);
+  }, [historyOpen, currentStudentId]);
+
+  // Handlers for new chat and resume
+  const resumeSession = (sid: string) => {
+    const msgs = historyMessages.filter((m) => m.session_id === sid);
+    const mapped: Message[] = msgs.map((m) => ({ id: m.id, sender: m.sender, text: m.message }));
+    setMessages(mapped);
+    setSessionId(sid);
+    setHistoryOpen(false);
+  };
+
+  const handleNewChat = () => {
+    const newId = uuidv4();
+    setSessionId(newId);
+    setMessages([]);
+    setHistoryOpen(false);
+  };
 
   // When a suggestion is clicked, send it immediately
   const handleSuggestionClick = (suggestion: string) => {
@@ -98,7 +217,7 @@ export default function AiAssistantPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ message: messageText }),
+        body: JSON.stringify({ message: messageText, sessionId }),
       });
 
       if (!response.ok) {
@@ -152,11 +271,131 @@ export default function AiAssistantPage() {
   return (
     // Main container takes full height and uses flex column layout
     <div className="flex flex-col h-full p-4 md:p-6">
-      {/* Title Area */}
-      <div className="mb-4">
+      {/* Title Area with New Chat & History */}
+      <div className="mb-4 flex items-center justify-between">
         <h1 className="text-2xl font-semibold">
           {isMounted && displayName ? `AI Assistant for ${displayName}` : 'AI Assistant'}
         </h1>
+        <div className="flex gap-2">
+          <Button variant="ghost" size="icon" aria-label="New Chat" onClick={handleNewChat}>
+            <Plus className="size-4" />
+          </Button>
+          {isMobile ? (
+            <Sheet open={historyOpen} onOpenChange={setHistoryOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" aria-label="Chat History">
+                  <Clock className="size-4" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="bottom" className="max-w-full">
+                <SheetHeader>
+                  <SheetTitle>Chat History</SheetTitle>
+                  <SheetDescription>Review past chat sessions</SheetDescription>
+                </SheetHeader>
+                <Tabs defaultValue="my" className="flex-1">
+                  <TabsList>
+                    <TabsTrigger value="my">My Chats</TabsTrigger>
+                    {isAdminUser && <TabsTrigger value="students">Student Chats</TabsTrigger>}
+                  </TabsList>
+                  <TabsContent value="my">
+                    {sessionsMine.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No past chats.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {sessionsMine.map((s) => (
+                          <Button key={s.sessionId} variant="outline" className="w-full text-left" onClick={() => resumeSession(s.sessionId)}>
+                            <div className="flex justify-between">
+                              <span>{new Date(s.timestamp).toLocaleString()}</span>
+                              <span className="font-medium">{s.preview}</span>
+                            </div>
+                          </Button>
+                        ))}
+                      </div>
+                    )}
+                  </TabsContent>
+                  {isAdminUser && (
+                    <TabsContent value="students">
+                      {sessionsAll.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No chats available.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {sessionsAll.map((s) => (
+                            <Button key={s.sessionId} variant="outline" className="w-full text-left" onClick={() => resumeSession(s.sessionId)}>
+                              <div className="flex justify-between">
+                                <span>{studentMap[s.studentId] || s.studentId} – {new Date(s.timestamp).toLocaleString()}</span>
+                                <span className="font-medium">{s.preview}</span>
+                              </div>
+                            </Button>
+                          ))}
+                        </div>
+                      )}
+                    </TabsContent>
+                  )}
+                </Tabs>
+                <SheetFooter>
+                  <Button variant="outline" onClick={() => setHistoryOpen(false)}>Close</Button>
+                </SheetFooter>
+              </SheetContent>
+            </Sheet>
+          ) : (
+            <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
+              <DialogTrigger asChild>
+                <Button variant="ghost" size="icon" aria-label="Chat History">
+                  <Clock className="size-4" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl w-full">
+                <DialogHeader>
+                  <DialogTitle>Chat History</DialogTitle>
+                  <DialogDescription>Review past chat sessions</DialogDescription>
+                </DialogHeader>
+                <Tabs defaultValue="my" className="flex-1">
+                  <TabsList>
+                    <TabsTrigger value="my">My Chats</TabsTrigger>
+                    {isAdminUser && <TabsTrigger value="students">Student Chats</TabsTrigger>}
+                  </TabsList>
+                  <TabsContent value="my">
+                    {sessionsMine.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No past chats.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {sessionsMine.map((s) => (
+                          <Button key={s.sessionId} variant="outline" className="w-full text-left" onClick={() => resumeSession(s.sessionId)}>
+                            <div className="flex justify-between">
+                              <span>{new Date(s.timestamp).toLocaleString()}</span>
+                              <span className="font-medium">{s.preview}</span>
+                            </div>
+                          </Button>
+                        ))}
+                      </div>
+                    )}
+                  </TabsContent>
+                  {isAdminUser && (
+                    <TabsContent value="students">
+                      {sessionsAll.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No chats available.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {sessionsAll.map((s) => (
+                            <Button key={s.sessionId} variant="outline" className="w-full text-left" onClick={() => resumeSession(s.sessionId)}>
+                              <div className="flex justify-between">
+                                <span>{studentMap[s.studentId] || s.studentId} – {new Date(s.timestamp).toLocaleString()}</span>
+                                <span className="font-medium">{s.preview}</span>
+                              </div>
+                            </Button>
+                          ))}
+                        </div>
+                      )}
+                    </TabsContent>
+                  )}
+                </Tabs>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setHistoryOpen(false)}>Close</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
+        </div>
       </div>
 
       {/* Content Area (Initial View or Chat Log) - Takes remaining space and scrolls */}
