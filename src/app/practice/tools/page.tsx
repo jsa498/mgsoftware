@@ -58,6 +58,13 @@ const noteFileMap: { [key: string]: string } = {
   "G#": "G_sharp.mp3",
 };
 
+// Extend Window interface to include prefixed AudioContext
+declare global {
+  interface Window {
+    webkitAudioContext?: typeof AudioContext;
+  }
+}
+
 export default function PracticeToolsPage() {
   const [bpm, setBpm] = useState(100)
   const [currentNote, setCurrentNote] = useState("A")
@@ -89,8 +96,11 @@ export default function PracticeToolsPage() {
   
   // Timer ref to store interval ID
   const timerRef = useRef<NodeJS.Timeout | null>(null)
-  const noteAudioRefs = useRef<Record<string, HTMLAudioElement>>({});
+  // Ref to hold each note's HTMLAudioElement and associated WebAudio gain node
+  const noteAudioRefs = useRef<Record<string, { element: HTMLAudioElement; gainNode: GainNode }>>({});
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+  // Single AudioContext for WebAudio control (Tanpura & Howler)
+  const audioContextRef = useRef<AudioContext | null>(null);
   
   // Add instrument, taal, and raag state with dynamic raag options
   const [instrument, setInstrument] = useState("sitar")
@@ -204,24 +214,48 @@ export default function PracticeToolsPage() {
     }
   }, [startTimer, calculatePoints])
   
-  // Preload all Tanpura audio files on mount for immediate playback
+  // Initialize AudioContext once for WebAudio operations
   useEffect(() => {
-    Object.entries(noteFileMap).forEach(([note, fileName]) => {
-      const { data } = supabase.storage.from('instrument-audio').getPublicUrl(fileName)
-      const url = data?.publicUrl
-      if (url) {
-        const audio = new Audio(url)
-        audio.loop = true
-        audio.preload = 'auto'
-        audio.load()
-        noteAudioRefs.current[note] = audio
-      } else {
-        console.error(`Could not preload audio for note ${note}`)
-      }
-    })
-  }, [])
+    // Choose the available AudioContext constructor
+    const ContextCtor: typeof AudioContext = window.AudioContext ?? window.webkitAudioContext!;
+    audioContextRef.current = new ContextCtor();
+  }, []);
 
+  // Preload all Tanpura audio files with WebAudio gain nodes on mount
+  useEffect(() => {
+    const context = audioContextRef.current;
+    if (!context) return;
+    Object.entries(noteFileMap).forEach(([note, fileName]) => {
+      const { data } = supabase.storage.from('instrument-audio').getPublicUrl(fileName);
+      const url = data?.publicUrl;
+      if (url) {
+        const element = new Audio(url);
+        element.loop = true;
+        element.preload = 'auto';
+        element.load();
+        // Create WebAudio nodes
+        const srcNode = context.createMediaElementSource(element);
+        const gainNode = context.createGain();
+        srcNode.connect(gainNode).connect(context.destination);
+        noteAudioRefs.current[note] = { element, gainNode };
+      } else {
+        console.error(`Could not preload audio for note ${note}`);
+      }
+    });
+  }, []);
+
+  // Refs to hold latest audio play state & volumes for preload effect
+  const isAudioPlayingRef = useRef(isAudioPlaying)
+  useEffect(() => {
+    isAudioPlayingRef.current = isAudioPlaying
+  }, [isAudioPlaying])
+  const volumesRef = useRef(volumes)
+  useEffect(() => {
+    volumesRef.current = volumes
+  }, [volumes])
+  
   // Preload Lehra audio via Howler when instrument, taal, raag, or tonic note changes
+  // We manage volume and play-state via refs to avoid reloading the Howl on every slider change.
   useEffect(() => {
     // Preserve previous playback position
     const prevHowl = lehraHowlRef.current
@@ -238,19 +272,20 @@ export default function PracticeToolsPage() {
       if (prevHowl) {
         prevHowl.unload()
       }
+      // Use the latest volume from ref (fallback to full volume)
+      const initialVol = volumesRef.current.lehra / 100 || 1
       const newHowl = new Howl({
         src: [url],
         loop: true,
-        volume: volumes.lehra / 100,
+        volume: initialVol,
       })
       lehraHowlRef.current = newHowl
-      // Seamlessly resume playback if already playing
-      if (isAudioPlaying) {
+      // Seamlessly resume playback if the user was already playing
+      if (isAudioPlayingRef.current) {
         newHowl.once('load', () => {
           const duration = newHowl.duration()
           const seekPos = prevPos % duration
           newHowl.seek(seekPos)
-          // Only play if not already playing
           if (!newHowl.playing()) {
             newHowl.play()
           }
@@ -306,21 +341,26 @@ export default function PracticeToolsPage() {
 
   // Control Tanpura audio playback when note, play state, or volume changes
   useEffect(() => {
-    // Pause previously playing audio not matching current note
-    if (currentAudioRef.current && currentAudioRef.current !== noteAudioRefs.current[currentNote]) {
-      currentAudioRef.current.pause()
+    // Manage playback & gain for current note
+    const prevEl = currentAudioRef.current;
+    const refObj = noteAudioRefs.current[currentNote];
+    if (!refObj) return;
+    const { element, gainNode } = refObj;
+    // Pause any previous note
+    if (prevEl && prevEl !== element) {
+      prevEl.pause();
     }
-    const audio = noteAudioRefs.current[currentNote]
-    if (!audio) return
-
-    audio.volume = volumes.tanpura / 100
+    // Update gain value (WebAudio)
+    gainNode.gain.value = volumes.tanpura / 100;
     if (isAudioPlaying) {
-      audio.play().catch(e => console.error("Error playing audio:", e))
+      // Ensure AudioContext is resumed on user interaction
+      audioContextRef.current?.resume().catch(err => console.error('AudioContext resume error:', err));
+      element.play().catch(e => console.error('Error playing tanpura:', e));
     } else {
-      audio.pause()
+      element.pause();
     }
-    currentAudioRef.current = audio
-  }, [currentNote, isAudioPlaying, volumes.tanpura])
+    currentAudioRef.current = element;
+  }, [currentNote, isAudioPlaying, volumes.tanpura]);
 
   // Handle visibility changes
   useEffect(() => {
@@ -492,10 +532,9 @@ export default function PracticeToolsPage() {
 
   // Handle the bottom play button separately from practice session
   const handleBottomPlayButton = () => {
-    console.log("Bottom play button clicked - independent from practice session")
-    // Toggle only the audio playback state
-    setIsAudioPlaying(prev => !prev)
-    // Add any additional audio logic here
+    // Resume AudioContext on user gesture and toggle audio playback
+    audioContextRef.current?.resume().catch(err => console.error('AudioContext resume error:', err));
+    setIsAudioPlaying(prev => !prev);
   }
 
   // Handle continue after verification

@@ -141,6 +141,10 @@ const customRules: Array<{ pattern: RegExp; response: string | string[] }> = [
       "Goodbye! Take care and see you soon!",
       "See ya! Reach out anytime you need help!"
     ] },
+  // Practice advice
+  { pattern: /practice.*more/i, response: [
+      "Absolutely! Consistent, daily practice is the best way to master your instrument or vocals. To log and track your sessions, go to Practice → Tools in MGS VIDYALA. Let me know if you need any help finding it! 🎵"
+    ] },
 ];
 
 // Initialize Supabase Admin client for history logging
@@ -191,42 +195,49 @@ export async function POST(req: NextRequest) {
 
     // Normalize message and unify common slang (e.g. 'u' -> 'you')
     const normalizedMsg = normalizeMessage(userMessage).replace(/\bu\b/g, 'you');
-
-    // 0) Fuzzy dynamic handler for "you know me" variants including misspellings
-    // Split tokens for know-me check and strip helper verbs
-    const knowTokens = normalizedMsg.split(' ');
-    const leadVerbs = ['do','does','can','will'];
-    let knowTok = knowTokens;
-    if (leadVerbs.includes(knowTok[0])) knowTok = knowTok.slice(1);
-    // Add debug log before fuzzy know-me
-    console.log('[AI Chat] 🔎 running fuzzy know-me handler on:', knowTok);
-
-    // Fuzzy match sequence: you + know + me (with up to edits)
-    if (
-      knowTok.length >= 3 &&
-      knowTok[0] === 'you' &&
-      levenshtein(knowTok[1], 'know') <= 2 &&
-      levenshtein(knowTok[2], 'me') <= 2
-    ) {
-      // Personalized reply
-      let usernameReply = 'you';
-      if (userId !== null) {
-        const { data: userRow, error: userFetchError } = await supabaseAdmin
-          .from('users')
-          .select('username')
-          .eq('id', userId)
-          .single();
-        if (!userFetchError && userRow?.username) usernameReply = userRow.username;
+    // 0) Direct ID lookup for "how do you know my name" questions
+    if (/(?:know.*my.*name|you.*know.*me)/i.test(normalizedMsg)) {
+      const { data: row, error: idErr } = await supabaseAdmin
+        .from('ai_knowledge')
+        .select('text')
+        .eq('id', 'know-my-name-how')
+        .single();
+      if (!idErr && row?.text) {
+        console.log(`[AI Chat] 🏷️ ID-based KB match, replying: "${row.text}"`);
+        if (userId !== null && sessionId) {
+          await logMessage(userId, studentId, sessionId, 'ai', row.text);
+        }
+        return NextResponse.json({ response: row.text });
       }
-      const reply = `Yes, of course! You're ${usernameReply}.`;
-      console.log(`[AI Chat] 💡 Fuzzy know-me match, replying: "${reply}"`);
+    }
+    // 1) Supabase synonyms lookup via ILIKE for any substring match
+    const { data: synMatch, error: synErr } = await supabaseAdmin
+      .from('ai_knowledge')
+      .select('text')
+      .ilike('synonyms', `%${normalizedMsg}%`)
+      .limit(1);
+    if (!synErr && synMatch && synMatch.length) {
+      const reply = synMatch[0].text;
+      console.log(`[AI Chat] 💡 ILIKE synonyms match, replying: "${reply}"`);
+      if (userId !== null && sessionId) await logMessage(userId, studentId, sessionId, 'ai', reply);
+      return NextResponse.json({ response: reply });
+    }
+    // 2) Full-text search on the main text column
+    const { data: kbData, error: kbError } = await supabaseAdmin
+      .from('ai_knowledge')
+      .select('text')
+      .textSearch('text', normalizedMsg, { type: 'websearch', config: 'english' })
+      .limit(1);
+    if (!kbError && kbData?.length) {
+      const reply = kbData[0].text;
+      console.log(`[AI Chat] 🔍 Full-text KB match, replying: "${reply}"`);
       if (userId !== null && sessionId) {
         await logMessage(userId, studentId, sessionId, 'ai', reply);
       }
       return NextResponse.json({ response: reply });
     }
 
-    // 1) Check for custom rule-based replies first
+    // 2) Check for custom rule-based replies first
     for (const rule of customRules) {
       if (rule.pattern.test(normalizedMsg)) {
         const responses = Array.isArray(rule.response) ? rule.response : [rule.response];
@@ -240,7 +251,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 2) Robust greeting detection (fuzzy match on the first token)
+    // 3) Robust greeting detection (fuzzy match on the first token)
     const normalized = normalizeMessage(userMessage);
     const firstToken = normalized.split(' ')[0];
     if (isFuzzyGreeting(firstToken)) {
@@ -253,7 +264,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ response: reply });
     }
 
-    // 3) Fuzzy DevFlow detection (broader matching without question-word guard)
+    // 4) Fuzzy DevFlow detection (broader matching without question-word guard)
     const devflowTokens = normalized.split(' ');
     const hasDevflow = devflowTokens.some(token => isFuzzyDevflow(token));
     if (hasDevflow) {
@@ -266,7 +277,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ response: devflowReply });
     }
 
-    // 4) Check for simple math expressions (addition, subtraction, multiplication, division, parentheses)
+    // 5) Check for simple math expressions (addition, subtraction, multiplication, division, parentheses)
     const mathMsg = normalizedMsg.trim();
     let expr = '';
     const mathPrefixMatch = mathMsg.match(/^(?:what(?:'s|s)?(?:\s+is)?|calculate)\s+(.+)$/i);
@@ -297,7 +308,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 5) Provide varied replies for 'smartness' queries
+    // 6) Provide varied replies for 'smartness' queries
     const smartPatterns: RegExp[] = [
       /how\s+smart\s+are\s+you\??/i,
       /are\s+you\s+smart\??/i,
@@ -312,22 +323,6 @@ export async function POST(req: NextRequest) {
       const reply = smartReplies[Math.floor(Math.random() * smartReplies.length)];
       console.log(`[AI Chat] 🤖 Smartness query matched, selected reply: "${reply}"`);
       // Record AI smartness reply
-      if (userId !== null && sessionId) {
-        await logMessage(userId, studentId, sessionId, 'ai', reply);
-      }
-      return NextResponse.json({ response: reply });
-    }
-
-    // 7) Full-text KB lookup via ai_knowledge table
-    const { data: kbData, error: kbError } = await supabaseAdmin
-      .from('ai_knowledge')
-      .select('text')
-      .textSearch('text', normalizedMsg, { type: 'websearch', config: 'english' })
-      .limit(1);
-    if (kbError) console.error('[AI Chat] KB textSearch error', kbError);
-    if (kbData && kbData.length > 0) {
-      const reply = kbData[0].text;
-      console.log(`[AI Chat] 📄 Full-text KB match found, replying: "${reply}"`);
       if (userId !== null && sessionId) {
         await logMessage(userId, studentId, sessionId, 'ai', reply);
       }

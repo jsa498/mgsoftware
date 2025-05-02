@@ -37,5 +37,7 @@ INSERT INTO public.ai_knowledge (id, text) VALUES
 ('positive-feedback-response', $$That's great to hear! I'm glad I could help.$$),
 ('negative-feedback-response', $$I'm sorry to hear that I wasn't helpful. Could you please rephrase your question or provide more details so I can try again?$$),
 ('capability-unsure', $$I'm not sure if I can help with that specific request. My expertise is mainly around the features and usage of the MGS VIDYALA platform itself.$$),
-('ask-for-clarification', $$Could you please provide a bit more detail or rephrase your question? I want to make sure I understand.$$)
+('ask-for-clarification', $$Could you please provide a bit more detail or rephrase your question? I want to make sure I understand.$$'),
+('know-my-name-how', $$I know your name because you provided it during registration, so I can personalize our conversation. Would you like me to address you by your name?$$'),
+('practice-more-advice', $$Consistent practice is key to improvement! Aim for regular sessions, even if short, and focus on areas you want to improve. How much time can you dedicate each day?$$')
 ON CONFLICT (id) DO NOTHING;
