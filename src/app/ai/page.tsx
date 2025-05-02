@@ -35,7 +35,7 @@ import {
   SheetTitle,
   SheetDescription,
 } from '@/components/ui/sheet';
-import { Clock, Plus } from 'lucide-react';
+import { Clock, Plus, Search, BrainCircuit, Image as ImageIcon, Mic, SendHorizontal } from 'lucide-react';
 import { getAllStudents } from '@/lib/data-service';
 
 // Define a type for the message structure
@@ -549,21 +549,49 @@ export default function AiAssistantPage() {
         )}
       </div>
 
-      {/* Input Area - Sticks to the bottom */}
-      <div className="pt-4 border-t"> 
-        <div className="flex w-full items-center space-x-2">
+      {/* Input Area - Fixed at the bottom */}
+      <div className="mt-auto pt-4">
+        {/* New container div for rounded input bar */}
+        <div className="flex items-center p-2 rounded-full bg-muted border border-border">
+          {/* Placeholder Buttons - TODO: Add onClick handlers */}
+          <Button variant="ghost" size="icon" className="rounded-full text-muted-foreground hover:text-foreground">
+            <Plus className="size-5" /> {/* Using Plus as placeholder for 'Add' or similar */}
+          </Button>
+          <Button variant="ghost" size="icon" className="rounded-full text-muted-foreground hover:text-foreground">
+            <Search className="size-5" />
+          </Button>
+          <Button variant="ghost" size="icon" className="rounded-full text-muted-foreground hover:text-foreground">
+            <BrainCircuit className="size-5" /> {/* Placeholder for 'Deep Research' */}
+          </Button>
+          <Button variant="ghost" size="icon" className="rounded-full text-muted-foreground hover:text-foreground">
+            <ImageIcon className="size-5" />
+          </Button>
+
+          {/* Actual Input - takes up remaining space */}
           <Input
             type="text"
             placeholder="Type your message..."
             value={inputValue}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            className="flex-1"
-            aria-label="Chat message input"
-            disabled={isLoading} // Disable input while loading
+            disabled={isLoading} // Disable input when loading
+            className="flex-1 mx-2 px-4 py-2 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 text-foreground placeholder:text-muted-foreground"
           />
-          <Button type="button" onClick={() => handleSendMessage()} disabled={inputValue.trim() === '' || isLoading}>
-            {isLoading ? "Sending..." : "Send"} {/* Change button text/state while loading */}
+
+          {/* Placeholder Buttons - TODO: Add onClick handlers */}
+          <Button variant="ghost" size="icon" className="rounded-full text-muted-foreground hover:text-foreground">
+            <Mic className="size-5" />
+          </Button>
+
+          {/* Send Button */}
+          <Button
+            onClick={() => handleSendMessage()}
+            disabled={isLoading || inputValue.trim() === ''} // Disable when loading or input is empty
+            size="icon"
+            className="rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground"
+          >
+            <SendHorizontal className="size-5" />
+            <span className="sr-only">Send</span>
           </Button>
         </div>
       </div>

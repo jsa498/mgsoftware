@@ -189,9 +189,46 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid message format' }, { status: 400 });
     }
 
+    // Normalize message and unify common slang (e.g. 'u' -> 'you')
+    const normalizedMsg = normalizeMessage(userMessage).replace(/\bu\b/g, 'you');
+
+    // 0) Fuzzy dynamic handler for "you know me" variants including misspellings
+    // Split tokens for know-me check and strip helper verbs
+    const knowTokens = normalizedMsg.split(' ');
+    const leadVerbs = ['do','does','can','will'];
+    let knowTok = knowTokens;
+    if (leadVerbs.includes(knowTok[0])) knowTok = knowTok.slice(1);
+    // Add debug log before fuzzy know-me
+    console.log('[AI Chat] 🔎 running fuzzy know-me handler on:', knowTok);
+
+    // Fuzzy match sequence: you + know + me (with up to edits)
+    if (
+      knowTok.length >= 3 &&
+      knowTok[0] === 'you' &&
+      levenshtein(knowTok[1], 'know') <= 2 &&
+      levenshtein(knowTok[2], 'me') <= 2
+    ) {
+      // Personalized reply
+      let usernameReply = 'you';
+      if (userId !== null) {
+        const { data: userRow, error: userFetchError } = await supabaseAdmin
+          .from('users')
+          .select('username')
+          .eq('id', userId)
+          .single();
+        if (!userFetchError && userRow?.username) usernameReply = userRow.username;
+      }
+      const reply = `Yes, of course! You're ${usernameReply}.`;
+      console.log(`[AI Chat] 💡 Fuzzy know-me match, replying: "${reply}"`);
+      if (userId !== null && sessionId) {
+        await logMessage(userId, studentId, sessionId, 'ai', reply);
+      }
+      return NextResponse.json({ response: reply });
+    }
+
     // 1) Check for custom rule-based replies first
     for (const rule of customRules) {
-      if (rule.pattern.test(userMessage.trim())) {
+      if (rule.pattern.test(normalizedMsg)) {
         const responses = Array.isArray(rule.response) ? rule.response : [rule.response];
         const reply = responses[Math.floor(Math.random() * responses.length)];
         console.log(`[AI Chat] 🎯 Custom rule matched (${rule.pattern}), responding: "${reply}"`);
@@ -217,11 +254,11 @@ export async function POST(req: NextRequest) {
     }
 
     // 3) Fuzzy DevFlow detection (broader matching without question-word guard)
-    const tokens = normalized.split(' ');
-    const hasDevflow = tokens.some(token => isFuzzyDevflow(token));
+    const devflowTokens = normalized.split(' ');
+    const hasDevflow = devflowTokens.some(token => isFuzzyDevflow(token));
     if (hasDevflow) {
       const devflowReply = "DevFlow is a software company that works across many areas of software development.";
-      console.log(`[AI Chat] 🔧 Fuzzy DevFlow detected in tokens [${tokens.join(', ')}], replying: "${devflowReply}"`);
+      console.log(`[AI Chat] 🔧 Fuzzy DevFlow detected in devflowTokens [${devflowTokens.join(', ')}], replying: "${devflowReply}"`);
       // Record AI reply
       if (userId !== null && sessionId) {
         await logMessage(userId, studentId, sessionId, 'ai', devflowReply);
@@ -230,7 +267,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 4) Check for simple math expressions (addition, subtraction, multiplication, division, parentheses)
-    const mathMsg = userMessage.trim();
+    const mathMsg = normalizedMsg.trim();
     let expr = '';
     const mathPrefixMatch = mathMsg.match(/^(?:what(?:'s|s)?(?:\s+is)?|calculate)\s+(.+)$/i);
     if (mathPrefixMatch) {
@@ -271,7 +308,7 @@ export async function POST(req: NextRequest) {
       "I've been trained on MGS Vidyala features extensively—ask me anything!",
       "I'm designed to be knowledgeable about MGS Vidyala. How can I help?",
     ];
-    if (smartPatterns.some((p) => p.test(userMessage.trim()))) {
+    if (smartPatterns.some((p) => p.test(normalizedMsg))) {
       const reply = smartReplies[Math.floor(Math.random() * smartReplies.length)];
       console.log(`[AI Chat] 🤖 Smartness query matched, selected reply: "${reply}"`);
       // Record AI smartness reply
@@ -281,8 +318,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ response: reply });
     }
 
+    // 7) Full-text KB lookup via ai_knowledge table
+    const { data: kbData, error: kbError } = await supabaseAdmin
+      .from('ai_knowledge')
+      .select('text')
+      .textSearch('text', normalizedMsg, { type: 'websearch', config: 'english' })
+      .limit(1);
+    if (kbError) console.error('[AI Chat] KB textSearch error', kbError);
+    if (kbData && kbData.length > 0) {
+      const reply = kbData[0].text;
+      console.log(`[AI Chat] 📄 Full-text KB match found, replying: "${reply}"`);
+      if (userId !== null && sessionId) {
+        await logMessage(userId, studentId, sessionId, 'ai', reply);
+      }
+      return NextResponse.json({ response: reply });
+    }
+
     // Use the new embedding-based search
-    const aiResponse = await findBestKnowledgeMatch(userMessage);
+    const aiResponse = await findBestKnowledgeMatch(normalizedMsg);
     console.log(`[AI Chat] 🔍 Embedding-based search returned: "${aiResponse}"`);
 
     // TODO: Add logic here later to save interaction to Supabase
