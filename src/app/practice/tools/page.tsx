@@ -229,7 +229,10 @@ export default function PracticeToolsPage() {
       const { data } = supabase.storage.from('instrument-audio').getPublicUrl(fileName);
       const url = data?.publicUrl;
       if (url) {
-        const element = new Audio(url);
+        // Create HTMLAudioElement with CORS to allow WebAudio source
+        const element = new Audio();
+        element.crossOrigin = 'anonymous';
+        element.src = url;
         element.loop = true;
         element.preload = 'auto';
         element.load();
