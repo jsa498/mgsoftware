@@ -250,25 +250,37 @@ export default function PracticeToolsPage() {
           const duration = newHowl.duration()
           const seekPos = prevPos % duration
           newHowl.seek(seekPos)
-          newHowl.play()
+          // Only play if not already playing
+          if (!newHowl.playing()) {
+            newHowl.play()
+          }
         })
       }
     } else {
       console.error(`Could not preload Lehra audio for ${filePath}`)
     }
-  }, [instrument, taal, raag, currentNote, isAudioPlaying, volumes.lehra])
+  }, [instrument, taal, raag, currentNote])
 
-  // Control Lehra playback (play/pause and volume)
+  // Update Lehra volume without restarting playback
   useEffect(() => {
     const howl = lehraHowlRef.current
     if (!howl) return
     howl.volume(volumes.lehra / 100)
+  }, [volumes.lehra])
+
+  // Play or pause Lehra without overlap
+  useEffect(() => {
+    const howl = lehraHowlRef.current
+    if (!howl) return
     if (isAudioPlaying) {
-      howl.play()
+      // Avoid overlapping plays
+      if (!howl.playing()) {
+        howl.play()
+      }
     } else {
       howl.pause()
     }
-  }, [isAudioPlaying, volumes.lehra])
+  }, [isAudioPlaying])
 
   // Track and display current matra (beat) within the cycle
   useEffect(() => {
