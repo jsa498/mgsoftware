@@ -309,8 +309,8 @@ export default function AiAssistantPage() {
     // Main container takes full height and uses flex column layout
     <div className="flex flex-col h-full p-4 md:p-6">
       {/* Title Area with New Chat & History */}
-      <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">
+      <div className="mb-4 flex items-center justify-end md:justify-between">
+        <h1 className="hidden md:block text-2xl font-semibold">
           {isMounted && displayName ? `AI Assistant for ${displayName}` : 'AI Assistant'}
         </h1>
         <div className="flex gap-2">
