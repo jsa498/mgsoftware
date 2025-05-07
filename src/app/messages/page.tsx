@@ -82,7 +82,7 @@ export default function MessagesPage() {
       )}
 
       <ScrollArea className="flex-1 px-4 py-2">
-        <div className="grid gap-4">
+        <div className="grid grid-cols-1 gap-4">
           {loading ? (
             // Loading skeletons
             Array.from({ length: 5 }).map((_, i) => (
@@ -104,7 +104,7 @@ export default function MessagesPage() {
                 <Card className="cursor-pointer hover:bg-accent/50 transition-colors">
                   <CardHeader className="pb-2">
                     <div className="flex justify-between items-center">
-                      <CardTitle className="text-base flex items-center gap-2">
+                      <CardTitle className="text-base flex items-center gap-2 truncate">
                         {group.name}
                         {group.unreadCount > 0 && (
                           <Badge variant="default" className="rounded-full px-2 py-0 h-5 text-xs">
