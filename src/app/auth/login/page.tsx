@@ -47,11 +47,11 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen">
+    <div className="flex items-center justify-center min-h-screen ambient-login-glow-background">
       <div className="absolute top-4 right-4">
         <ThemeToggle />
       </div>
-      <Card className="w-full max-w-md mx-auto shadow-lg rounded-xl overflow-hidden">
+      <Card className="w-full max-w-md mx-auto bg-transparent rounded-xl overflow-hidden">
         <CardHeader className="py-4 text-center space-y-2 border-b">
           <div className="flex justify-center items-center space-x-3">
             <Image 

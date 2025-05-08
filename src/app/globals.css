@@ -127,6 +127,35 @@
   100% { width: 100%; }
 }
 
+/* Keyframes for a smaller, darker, multi-color glowing bar effect */
+@keyframes ambient-bar-glow {
+  0% {
+    box-shadow: 0 0 1px 0px #FF0000,   /* Red - Innermost, very tight */
+                0 0 3px 1px #FF000088, /* Middle, darker/more transparent */
+                0 0 6px 2px #FF000044;  /* Outermost, very faint */
+  }
+  25% {
+    box-shadow: 0 0 1px 0px #00FF00,   /* Green */
+                0 0 3px 1px #00FF0088,
+                0 0 6px 2px #00FF0044;
+  }
+  50% {
+    box-shadow: 0 0 1px 0px #0000FF,   /* Blue */
+                0 0 3px 1px #0000FF88,
+                0 0 6px 2px #0000FF44;
+  }
+  75% {
+    box-shadow: 0 0 1px 0px #FFFF00,   /* Yellow */
+                0 0 3px 1px #FFFF0088,
+                0 0 6px 2px #FFFF0044;
+  }
+  100% {
+    box-shadow: 0 0 1px 0px #FF0000,   /* Red - loop */
+                0 0 3px 1px #FF000088,
+                0 0 6px 2px #FF000044;
+  }
+}
+
 /* Prevent iOS input zoom */
 @media screen and (max-width: 768px) { /* md breakpoint */
   input[type="text"],
@@ -140,4 +169,46 @@
   select {
     font-size: 16px !important; /* Ensure override */
   }
+}
+
+.ambient-header-box {
+  background-color: transparent !important; 
+  border-color: transparent !important;     
+  border-radius: var(--radius-sm, 0.375rem);
+  animation: ambient-bar-glow 6s infinite linear; 
+  text-shadow: none !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@keyframes ambient-page-glow {
+  0% {
+    box-shadow: inset 0 0 100px 50px #FF000011, /* Faint, large Red */
+                inset 0 0 150px 75px #00000022; /* Very faint, very large base shadow */
+  }
+  25% {
+    box-shadow: inset 0 0 100px 50px #00FF0011, /* Faint, large Green */
+                inset 0 0 150px 75px #00000022;
+  }
+  50% {
+    box-shadow: inset 0 0 100px 50px #0000FF11, /* Faint, large Blue */
+                inset 0 0 150px 75px #00000022;
+  }
+  75% {
+    box-shadow: inset 0 0 100px 50px #FFFF0011, /* Faint, large Yellow */
+                inset 0 0 150px 75px #00000022;
+  }
+  100% {
+    box-shadow: inset 0 0 100px 50px #FF000011, /* Faint, large Red */
+                inset 0 0 150px 75px #00000022;
+  }
+}
+
+.ambient-login-glow-background {
+  width: 100vw;
+  height: 100vh;
+  animation: ambient-page-glow 12s infinite linear;
+  background-color: var(--background); /* Ensure it has the base background color */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }

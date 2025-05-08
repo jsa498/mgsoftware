@@ -204,8 +204,8 @@ export function Sidebar({ className, ...props }: SidebarProps) {
     return (
       <>
         {/* Mobile Floating Navigation Bar */}
-        <div className="fixed top-2 left-1/2 transform -translate-x-1/2 z-[100] flex items-center justify-between bg-background border rounded-full shadow-lg px-4 py-1.5 w-9/12 max-w-[16rem]">
-          <span className="font-semibold">MGS VIDYALA</span>
+        <div className="fixed top-2 left-1/2 transform -translate-x-1/2 z-[100] flex items-center justify-between bg-background border rounded-full shadow-lg px-4 py-1.5 w-9/12 max-w-[16rem] ambient-header-box">
+          <span className="font-semibold">MGSV</span>
           <div className="flex items-center gap-2">
             <ThemeToggle />
             <Button 
@@ -433,8 +433,10 @@ export function Sidebar({ className, ...props }: SidebarProps) {
   // Desktop view - original sidebar  
   return (
     <div className={cn("flex flex-col h-screen bg-background border-r", className)} {...props}>
-      <div className="px-3 py-2 flex items-center h-16 border-b">
-        <h2 className="text-lg font-semibold flex-1">MGS VIDYALA</h2>
+      <div className="px-3 py-2 flex items-center h-16 border-b ambient-header-box">
+        <h2 className="text-lg font-semibold flex-1">
+          MGSV
+        </h2>
         <ThemeToggle />
       </div>
       <div className="flex-1 overflow-auto py-2">
