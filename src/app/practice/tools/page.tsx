@@ -718,40 +718,47 @@ export default function PracticeToolsPage() {
 
           {/* Instrument Selection */}
           <div className="flex flex-row gap-2 overflow-x-auto pb-1 w-full sm:grid sm:grid-cols-3 sm:gap-3 md:gap-4">
-            <Select value={instrument} onValueChange={setInstrument}>
-              <SelectTrigger className="rounded-lg min-w-[120px] sm:min-w-0">
-                <SelectValue placeholder="Instrument" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="sarangi">Sarangi</SelectItem>
-                <SelectItem value="violin">Violin</SelectItem>
-                <SelectItem value="sitar">Sitar</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={taal} onValueChange={setTaal}>
-              <SelectTrigger className="rounded-lg min-w-[120px] sm:min-w-0">
-                <SelectValue placeholder="Taal" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="roopak">Roopak (7)</SelectItem>
-                <SelectItem value="teental">Teental (16)</SelectItem>
-                <SelectItem value="dadra">Dadra (6)</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={raag} onValueChange={setRaag}>
-              <SelectTrigger className="rounded-lg min-w-[120px] sm:min-w-0">
-                <SelectValue placeholder="Raag" />
-              </SelectTrigger>
-              <SelectContent>
-                {raagOptions.map((r: string) => (
-                  <SelectItem key={r} value={r}>
-                    {r.charAt(0).toUpperCase() + r.slice(1)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs text-muted-foreground">INSTRUMENT</Label>
+              <Select value={instrument} onValueChange={setInstrument}>
+                <SelectTrigger className="rounded-lg min-w-[120px] sm:min-w-0">
+                  <SelectValue placeholder="Instrument" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sarangi">Sarangi</SelectItem>
+                  <SelectItem value="violin">Violin</SelectItem>
+                  <SelectItem value="sitar">Sitar</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs text-muted-foreground">TAAL</Label>
+              <Select value={taal} onValueChange={setTaal}>
+                <SelectTrigger className="rounded-lg min-w-[120px] sm:min-w-0">
+                  <SelectValue placeholder="Taal" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="roopak">Roopak (7)</SelectItem>
+                  <SelectItem value="teental">Teental (16)</SelectItem>
+                  <SelectItem value="dadra">Dadra (6)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs text-muted-foreground">RAAG</Label>
+              <Select value={raag} onValueChange={setRaag}>
+                <SelectTrigger className="rounded-lg min-w-[120px] sm:min-w-0">
+                  <SelectValue placeholder="Raag" />
+                </SelectTrigger>
+                <SelectContent>
+                  {raagOptions.map((r: string) => (
+                    <SelectItem key={r} value={r}>
+                      {r.charAt(0).toUpperCase() + r.slice(1)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           {/* Volume Controls */}

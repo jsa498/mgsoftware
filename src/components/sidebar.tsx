@@ -21,7 +21,8 @@ import {
   Library,
   Bot,
   Menu,
-  X
+  X,
+  Book
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -73,6 +74,11 @@ export function Sidebar({ className, ...props }: SidebarProps) {
           icon: BookOpen,
         },
         {
+          name: "Raags",
+          href: "/practice/raags",
+          icon: Book,
+        },
+        {
           name: "Upload Practice",
           href: "/practice/upload",
           icon: Upload,
@@ -90,6 +96,11 @@ export function Sidebar({ className, ...props }: SidebarProps) {
           icon: BookOpen,
         },
         {
+          name: "Raags",
+          href: "/practice/raags",
+          icon: Book,
+        },
+        {
           name: "Practice Media",
           href: "/practice/media",
           icon: Library,
@@ -101,7 +112,7 @@ export function Sidebar({ className, ...props }: SidebarProps) {
         }
       ];
 
-  // Routes for admin users (unchanged)
+  // Routes for admin users
   const adminRoutes = [
     {
       name: "Dashboard",
@@ -129,6 +140,11 @@ export function Sidebar({ className, ...props }: SidebarProps) {
       icon: Trophy,
     },
     {
+      name: "Gurbani Searcher",
+      href: "/gurbani",
+      icon: Book,
+    },
+    {
       name: "Messages",
       href: "/messages",
       icon: MessageSquare,
@@ -145,7 +161,7 @@ export function Sidebar({ className, ...props }: SidebarProps) {
     }
   ]
 
-  // Routes for student users (reordered with profile)
+  // Routes for student users
   const studentRoutes = [
     {
       name: "Dashboard",
@@ -156,6 +172,11 @@ export function Sidebar({ className, ...props }: SidebarProps) {
       name: "Leaderboard",
       href: "/leaderboard",
       icon: Trophy,
+    },
+    {
+      name: "Gurbani Searcher",
+      href: "/gurbani",
+      icon: Book,
     },
     {
       name: "Profile",
