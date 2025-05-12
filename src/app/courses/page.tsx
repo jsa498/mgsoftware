@@ -41,15 +41,15 @@ export default function CoursesPage() {
             </div>
           )}
           <CardHeader>
-            <CardTitle>Raags</CardTitle>
-            <CardDescription>Explore the world of Raags and their nuances.</CardDescription>
+            <CardTitle className="text-6xl md:text-2xl">Introduction To Raags 101</CardTitle>
+            <CardDescription>Dive into the rich world of Raags, exploring their melodic structures, emotional expressions, and performance techniques.</CardDescription>
           </CardHeader>
           <CardContent>
             <p className="font-semibold">What you'll learn:</p>
-            <ul className="list-disc list-inside space-y-1 text-sm">
-              <li>Introduction to Raags</li>
-              <li>Structure and mood</li>
-              <li>Performance techniques</li>
+            <ul className="list-disc list-inside space-y-1 text-sm font-normal text-muted-foreground">
+              <li>Gain a foundational understanding of Raags, their history, and theoretical framework</li>
+              <li>Explore the emotional mood and expressive nuances of key Raags</li>
+              <li>Master practical performance techniques and improvisation approaches</li>
             </ul>
           </CardContent>
           <CardFooter>
