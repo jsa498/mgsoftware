@@ -29,9 +29,9 @@ export default function PracticeLayout({
   }, [])
 
   return (
-    <div className="flex h-screen">
-      <Sidebar />
-      <main className={`flex-1 overflow-auto ${isMobile ? 'pt-20' : ''}`}>
+    <div className="flex h-screen bg-background">
+      <Sidebar className="w-64 hidden md:flex" />
+      <main className={`flex-1 overflow-auto p-6 relative ${isMobile ? 'pt-20' : ''}`}>
         {children}
       </main>
     </div>

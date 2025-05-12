@@ -226,17 +226,15 @@ export function Sidebar({ className, ...props }: SidebarProps) {
             isMobileMenuOpen ? "translate-x-0" : "translate-x-full"
           )}
         >
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute top-4 right-4"
+            onClick={toggleMobileMenu}
+          >
+            <X className="h-5 w-5" />
+          </Button>
           <div className="flex flex-col h-screen">
-            <div className="px-4 py-3 flex items-center justify-end h-16 border-b">
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className=""
-                onClick={toggleMobileMenu}
-              >
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
             
             <div className="flex-1 overflow-auto py-4">
               <nav className="grid items-start px-4 text-sm font-medium gap-2">
@@ -411,7 +409,7 @@ export function Sidebar({ className, ...props }: SidebarProps) {
               </nav>
             </div>
             
-            <div className="px-4 py-4 border-t mt-auto">
+            <div className="px-4 pt-4 pb-8 border-t mt-auto">
               <Button
                 variant="ghost" 
                 className="w-full justify-start text-muted-foreground hover:text-primary py-3"
