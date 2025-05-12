@@ -3,6 +3,7 @@
 import { Sidebar } from "@/components/sidebar"
 import { ProtectedRoute } from "@/components/protected-route"
 import { useEffect, useState } from "react"
+import { usePathname } from "next/navigation"
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -16,6 +17,8 @@ export function DashboardLayout({
   requireStudent = false 
 }: DashboardLayoutProps) {
   const [isMobile, setIsMobile] = useState(false)
+  const pathname = usePathname()
+  const isCourseNested = pathname.startsWith('/courses/')
   
   useEffect(() => {
     const checkIfMobile = () => {
@@ -33,7 +36,7 @@ export function DashboardLayout({
   return (
     <ProtectedRoute requireAdmin={requireAdmin} requireStudent={requireStudent}>
       <div className="flex h-screen bg-background">
-        <Sidebar className="w-64 hidden md:flex" />
+        {!isCourseNested && <Sidebar className="w-64 hidden md:flex" />}
         <main className={`flex-1 overflow-auto p-6 relative ${isMobile ? 'pt-20' : ''}`}>
           {children}
         </main>
