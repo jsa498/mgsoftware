@@ -2,26 +2,49 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter, usePathname } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, BookOpen } from "lucide-react";
+import { ChevronLeft, ChevronRight, BookOpen } from "lucide-react";
 import { modules } from "./data";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 
 export default function CourceRaagsLayout({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = React.useState(false);
-  const router = useRouter();
   const pathname = usePathname();
+
+  // Compute previous and next lesson links
+  const segments = pathname.split("/");
+  const currentModuleId = segments[3];
+  const currentLessonId = segments[4];
+  const flatLessons = modules.flatMap((mod) =>
+    mod.lessons.map((lsn) => ({
+      moduleId: mod.id,
+      lessonId: lsn.id,
+      title: lsn.title,
+    }))
+  );
+  const currentIndex = flatLessons.findIndex(
+    (item) => item.moduleId === currentModuleId && item.lessonId === currentLessonId
+  );
+  const prevLesson = currentIndex > 0 ? flatLessons[currentIndex - 1] : null;
+  const nextLesson = currentIndex < flatLessons.length - 1 ? flatLessons[currentIndex + 1] : null;
 
   return (
     <div className="flex min-h-screen">
       {/* Desktop sidebar */}
       <aside className="hidden md:block w-80 border-r">
         <div className="p-4">
-          <h2 className="text-lg font-semibold mb-4">Raags 101</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold">Raags 101</h2>
+            <Button variant="ghost" asChild>
+              <Link href="/courses">
+                <ChevronLeft size={16} /> Back
+              </Link>
+            </Button>
+          </div>
           <Accordion type="multiple" defaultValue={modules.map((mod) => mod.id)}>
             {modules.map((mod) => (
               <AccordionItem key={mod.id} value={mod.id}>
@@ -66,7 +89,14 @@ export default function CourceRaagsLayout({ children }: { children: React.ReactN
         </SheetTrigger>
         <SheetContent side="left">
           <SheetHeader>
-            <SheetTitle>Raags 101</SheetTitle>
+            <div className="flex items-center justify-between w-full">
+              <SheetTitle>Raags 101</SheetTitle>
+              <Button variant="ghost" asChild>
+                <Link href="/courses">
+                  <ChevronLeft size={16} /> Back
+                </Link>
+              </Button>
+            </div>
           </SheetHeader>
           <div className="p-4">
             <Accordion type="multiple" defaultValue={modules.map((mod) => mod.id)}>
@@ -110,10 +140,24 @@ export default function CourceRaagsLayout({ children }: { children: React.ReactN
 
       {/* Content pane */}
       <main className="flex-1 p-6">
-        <Button variant="ghost" onClick={() => router.back()} className="mb-4">
-          <ChevronLeft className="mr-2" size={16} /> Back
-        </Button>
         {children}
+        <div className="flex items-center mt-8">
+          {prevLesson && (
+            <Button variant="outline" asChild>
+              <Link href={`/courses/cource-raags/${prevLesson.moduleId}/${prevLesson.lessonId}`}>
+                <ChevronLeft size={16} /> {prevLesson.title}
+              </Link>
+            </Button>
+          )}
+          <div className="flex-1" />
+          {nextLesson && (
+            <Button variant="outline" asChild>
+              <Link href={`/courses/cource-raags/${nextLesson.moduleId}/${nextLesson.lessonId}`}>
+                {nextLesson.title} <ChevronRight size={16} />
+              </Link>
+            </Button>
+          )}
+        </div>
       </main>
     </div>
   );

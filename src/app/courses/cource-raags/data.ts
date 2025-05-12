@@ -7,8 +7,7 @@ export const modules: Module[] = [
     title: "Module 1: Introduction to Raags",
     lessons: [
       { id: "lesson-1", title: "What are Raags?" },
-      { id: "lesson-2", title: "History of Raags" },
-      { id: "lesson-3", title: "Basic Structures" },
+      { id: "lesson-2", title: "31 Raags In Guru Granth Sahib Ji" },
     ],
   },
   {
