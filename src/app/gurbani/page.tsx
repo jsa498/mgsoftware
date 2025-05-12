@@ -1,47 +1,49 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Skeleton } from "@/components/ui/skeleton"
 import { searchGurbani, GurbaniSearchResult } from "@/lib/gurbani-service"
 import { useToast } from "@/components/ui/use-toast"
+import { fetchIgurbaniIndex, IgurbaniIndexEntry } from "@/lib/igurbani-index-service"
 
 export default function GurbaniPage() {
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<GurbaniSearchResult[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [indexEntries, setIndexEntries] = useState<IgurbaniIndexEntry[]>([])
   const { toast } = useToast()
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!query.trim()) return
+  useEffect(() => {
+    fetchIgurbaniIndex().then(setIndexEntries).catch(console.error)
+  }, [])
 
+  const doSearch = async (q: string) => {
+    if (!q.trim()) return
+    setQuery(q)
     setIsLoading(true)
     setError(null)
-
     try {
-      const searchResults = await searchGurbani(query)
+      const searchResults = await searchGurbani(q)
       setResults(searchResults)
-      
       if (searchResults.length === 0) {
-        toast({
-          title: "No results found",
-          description: "Try a different search term",
-        })
+        toast({ title: "No results found", description: "Try a different search term" })
       }
-    } catch {
+    } catch (err) {
+      console.error('doSearch error for query:', q, err)
       setError("Failed to fetch Gurbani search results. Please try again.")
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to fetch Gurbani search results",
-      })
+      toast({ variant: "destructive", title: "Error", description: "Failed to fetch Gurbani search results" })
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    doSearch(query)
   }
 
   return (
@@ -115,6 +117,26 @@ export default function GurbaniPage() {
           ))
         )}
       </div>
+
+      {indexEntries.length > 0 && (
+        <div className="mb-6">
+          <h2 className="text-2xl font-semibold">Raag Index</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {indexEntries.map((entry) => (
+              <Card
+                key={entry.id}
+                className="cursor-pointer hover:shadow-lg"
+                onClick={() => doSearch(entry.raagKey)}
+              >
+                <CardContent>
+                  <div className="font-medium">{entry.raagKey}</div>
+                  <div className="text-sm text-muted-foreground">Page {entry.pageRef}</div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 } 

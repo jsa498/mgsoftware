@@ -9,10 +9,8 @@ export interface GurbaniSearchResult {
 
 export async function searchGurbani(query: string): Promise<GurbaniSearchResult[]> {
   try {
-    const response = await fetch(`https://api.sikhitothemax.org/search?q=${encodeURIComponent(query)}`, {
-      headers: {
-        'Accept': 'application/json',
-      },
+    const response = await fetch(`/api/search-gurbani?q=${encodeURIComponent(query)}`, {
+      headers: { 'Accept': 'application/json' },
     });
 
     if (!response.ok) {
@@ -20,7 +18,7 @@ export async function searchGurbani(query: string): Promise<GurbaniSearchResult[
     }
 
     const data = await response.json();
-    return data.results.map((result: GurbaniSearchResult) => ({
+    return data.map((result: GurbaniSearchResult) => ({
       shabad_id: result.shabad_id,
       shabad_name: result.shabad_name,
       page_no: result.page_no,
