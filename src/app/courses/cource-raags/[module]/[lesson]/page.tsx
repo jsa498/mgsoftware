@@ -22,7 +22,7 @@ export default async function LessonPage({ params }: LessonPageProps) {
     return (
       <div>
         <Typography.H1>{lesson!.title}</Typography.H1>
-        <Separator className="mt-2 mb-6 w-20 h-2 bg-muted-foreground" />
+        <div className="mt-2 mb-6 w-24 h-1 rounded bg-muted-foreground" />
 
         <Typography.H3 className="mt-8 border-l-4 border-primary pl-3">
           Raags in Gurbani
@@ -117,4 +117,4 @@ export default async function LessonPage({ params }: LessonPageProps) {
       </div>
     </div>
   );
-} 
+}
