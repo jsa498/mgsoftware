@@ -29,15 +29,16 @@ export default function CoursesPage() {
   return (
     <div className="container mx-auto p-10 grid grid-cols-1 md:grid-cols-3 gap-6">
       <Link href="/courses/cource-raags">
-        <Card className="cursor-pointer">
+        <Card className="cursor-pointer !pt-0 overflow-hidden">
           {thumbnailUrl && (
-            <Image
-              src={thumbnailUrl}
-              alt="Raags Thumbnail"
-              width={400}
-              height={200}
-              className="rounded-t-xl object-cover"
-            />
+            <div className="relative w-full h-48">
+              <Image
+                src={thumbnailUrl}
+                alt="Raags Thumbnail"
+                fill
+                className="object-cover"
+              />
+            </div>
           )}
           <CardHeader>
             <CardTitle>Raags</CardTitle>

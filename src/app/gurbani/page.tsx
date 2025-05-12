@@ -61,6 +61,19 @@ export default function GurbaniPage() {
     }
   };
 
+  // Automatically search when searchText has at least 4 characters, debounced by 300ms
+  useEffect(() => {
+    if (searchText.length > 3) {
+      const timeoutId = setTimeout(() => {
+        handleSearch(searchText);
+      }, 300);
+      return () => clearTimeout(timeoutId);
+    }
+    // Uncomment to clear results when fewer than 4 chars
+    // setResults([]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchText]);
+
   useEffect(() => {
     if (!selectedShabadId) return;
     const fetchShabad = async () => {
@@ -94,6 +107,40 @@ export default function GurbaniPage() {
     setSelectedShabadId(null);
     setShabadData(null);
     setShabadError(null);
+  };
+
+  // Print the shabad content
+  const handlePrint = () => {
+    if (!shabadData) return;
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    const { writer, raag, pageno } = shabadData.shabadinfo;
+    const title = `${writer.unicode} in ${raag.unicode} - ${pageno}`;
+    const styles = `
+      body { font-family: serif; padding: 2rem; }
+      h1 { font-size: 1.5rem; margin-bottom: 1rem; }
+      p { font-size: 1.2rem; line-height: 1.5; margin: 0.5rem 0; }
+    `;
+    const linesHtml = shabadData.shabad
+      .map((entry) => `<p>${entry.line.gurmukhi.unicode}</p>`)
+      .join('');
+    const html = `
+      <html>
+        <head>
+          <title>Print Shabad</title>
+          <style>${styles}</style>
+        </head>
+        <body>
+          <h1>${title}</h1>
+          ${linesHtml}
+        </body>
+      </html>
+    `;
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+    printWindow.close();
   };
 
   return (
@@ -193,6 +240,9 @@ export default function GurbaniPage() {
             )}
           </DialogDescription>
           <DialogFooter>
+            <Button variant="outline" onClick={handlePrint} disabled={!shabadData}>
+              Print
+            </Button>
             <Button onClick={closeModal}>Close</Button>
           </DialogFooter>
         </DialogContent>
