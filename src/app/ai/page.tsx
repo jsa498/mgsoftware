@@ -324,7 +324,7 @@ export default function AiAssistantPage() {
                   <Clock className="size-4" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="bottom" className="max-w-full">
+              <SheetContent side="bottom" className="max-w-full max-h-[80vh] overflow-y-auto">
                 <SheetHeader>
                   <SheetTitle>Chat History</SheetTitle>
                   <SheetDescription>Review past chat sessions</SheetDescription>
@@ -395,7 +395,7 @@ export default function AiAssistantPage() {
                   <Clock className="size-4" />
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-2xl w-full">
+              <DialogContent className="max-w-2xl w-full max-h-[80vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Chat History</DialogTitle>
                   <DialogDescription>Review past chat sessions</DialogDescription>

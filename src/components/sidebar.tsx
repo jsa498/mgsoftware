@@ -78,7 +78,7 @@ export function Sidebar({ className, ...props }: SidebarProps) {
           icon: Upload,
         },
         {
-          name: "Create Quiz",
+          name: "Courses",
           href: "/practice/quiz",
           icon: FileText,
         }
@@ -95,7 +95,7 @@ export function Sidebar({ className, ...props }: SidebarProps) {
           icon: Library,
         },
         {
-          name: "Quizzes",
+          name: "Courses",
           href: "/practice/quizzes",
           icon: FileText,
         }
