@@ -2,7 +2,6 @@ import { modules } from "../../data";
 import { notFound } from "next/navigation";
 import { Typography } from "@/components/ui/typography";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import { Separator } from "@/components/ui/separator";
 import { Card, CardContent } from "@/components/ui/card";
 
 interface LessonPageProps {
@@ -29,7 +28,7 @@ export default async function LessonPage({ params }: LessonPageProps) {
         </Typography.H3>
         <Card className="mt-2 mb-8">
           <CardContent className="space-y-3">
-            <Typography.P>Raag (rāga) literally means "colour" or "mood." In music it is a melodic framework that evokes a specific emotion.</Typography.P>
+            <Typography.P>Raag (rāga) literally means &quot;colour&quot; or &quot;mood.&quot; In music it is a melodic framework that evokes a specific emotion.</Typography.P>
             <Typography.P>Sri Guru Granth Sahib Ji is arranged almost entirely by raag; this ensures the shabad is sung exactly in the spirit the Gurus intended.</Typography.P>
             <Typography.P>Thirty-one primary raags appear in the scripture; with their related sub-forms and mixtures there are about sixty melodic modes in total.</Typography.P>
           </CardContent>
@@ -66,7 +65,7 @@ export default async function LessonPage({ params }: LessonPageProps) {
         </Card>
 
         <Typography.H3 className="mt-8 border-l-4 border-primary pl-3">
-          Categories you'll hear about
+          Categories you&apos;ll hear about
         </Typography.H3>
         <Card className="mt-2 mb-8">
           <CardContent>
@@ -100,7 +99,7 @@ export default async function LessonPage({ params }: LessonPageProps) {
         <Card className="mt-2 mb-8">
           <CardContent className="space-y-3">
             <Typography.P>
-              <strong>Sa Re Ga Ma Pa Dha Ni Sa'</strong> &ndash; the seven swaras common to all North-Indian music. Raags decide which notes are emphasised, skipped, or bent (<Typography.Code>meend</Typography.Code>), creating identity.
+              <strong>Sa Re Ga Ma Pa Dha Ni Sa&apos;</strong> &ndash; the seven swaras common to all North-Indian music. Raags decide which notes are emphasised, skipped, or bent (<Typography.Code>meend</Typography.Code>), creating identity.
             </Typography.P>
           </CardContent>
         </Card>

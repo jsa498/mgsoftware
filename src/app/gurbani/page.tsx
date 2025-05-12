@@ -71,7 +71,6 @@ export default function GurbaniPage() {
     }
     // Uncomment to clear results when fewer than 4 chars
     // setResults([]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchText]);
 
   useEffect(() => {

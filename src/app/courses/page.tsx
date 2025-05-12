@@ -45,7 +45,7 @@ export default function CoursesPage() {
             <CardDescription>Dive into the rich world of Raags, exploring their melodic structures, emotional expressions, and performance techniques.</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="font-semibold">What you'll learn:</p>
+            <p className="font-semibold">What you&apos;ll learn:</p>
             <ul className="list-disc list-inside space-y-1 text-sm font-normal text-muted-foreground">
               <li>Gain a foundational understanding of Raags, their history, and theoretical framework</li>
               <li>Explore the emotional mood and expressive nuances of key Raags</li>
