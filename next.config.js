@@ -1,3 +1,10 @@
+// add at the top of next.config.js to extract Supabase domain dynamically
+const { NEXT_PUBLIC_SUPABASE_URL } = process.env;
+if (!NEXT_PUBLIC_SUPABASE_URL) {
+  throw new Error('Missing environment variable NEXT_PUBLIC_SUPABASE_URL for Supabase domain');
+}
+const supabaseHostname = new URL(NEXT_PUBLIC_SUPABASE_URL).hostname;
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -7,6 +14,9 @@ const nextConfig = {
     maxInactiveAge: 60 * 60 * 1000,
     // Track more pages in memory
     pagesBufferLength: 10,
+  },
+  images: {
+    domains: [supabaseHostname],
   },
   // Add custom headers to help prevent caching issues
   async headers() {

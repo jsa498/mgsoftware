@@ -76,11 +76,6 @@ export function Sidebar({ className, ...props }: SidebarProps) {
           name: "Upload Practice",
           href: "/practice/upload",
           icon: Upload,
-        },
-        {
-          name: "Courses",
-          href: "/practice/quiz",
-          icon: FileText,
         }
       ]
     : [
@@ -93,15 +88,10 @@ export function Sidebar({ className, ...props }: SidebarProps) {
           name: "Practice Media",
           href: "/practice/media",
           icon: Library,
-        },
-        {
-          name: "Courses",
-          href: "/practice/quizzes",
-          icon: FileText,
         }
       ];
 
-  // Routes for admin users (unchanged)
+  // Routes for admin users (updated with Courses)
   const adminRoutes = [
     {
       name: "Dashboard",
@@ -122,6 +112,11 @@ export function Sidebar({ className, ...props }: SidebarProps) {
       name: "Attendance",
       href: "/attendance",
       icon: Calendar,
+    },
+    {
+      name: "Courses",
+      href: "/courses",
+      icon: FileText,
     },
     {
       name: "Leaderboard",
@@ -150,7 +145,7 @@ export function Sidebar({ className, ...props }: SidebarProps) {
     }
   ]
 
-  // Routes for student users (reordered with profile)
+  // Routes for student users (updated with Courses)
   const studentRoutes = [
     {
       name: "Dashboard",
@@ -161,6 +156,11 @@ export function Sidebar({ className, ...props }: SidebarProps) {
       name: "Leaderboard",
       href: "/leaderboard",
       icon: Trophy,
+    },
+    {
+      name: "Courses",
+      href: "/courses",
+      icon: FileText,
     },
     {
       name: "Gurbani",
