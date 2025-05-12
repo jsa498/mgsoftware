@@ -107,6 +107,19 @@ export default async function LessonPage({ params }: LessonPageProps) {
     );
   }
 
+  // Render formatted content for Lesson 2 with underline styling
+  if (moduleId === "module-1" && lessonId === "lesson-2") {
+    return (
+      <div>
+        <Typography.H1>{lesson!.title}</Typography.H1>
+        <div className="mt-2 mb-6 w-24 h-1 rounded bg-muted-foreground" />
+        <div className="prose dark:prose-invert">
+          <Typography.P>Content for {lesson!.title} coming soon.</Typography.P>
+        </div>
+      </div>
+    );
+  }
+
   // Fallback for other lessons
   return (
     <div>
