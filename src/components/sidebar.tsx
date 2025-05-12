@@ -129,6 +129,11 @@ export function Sidebar({ className, ...props }: SidebarProps) {
       icon: Trophy,
     },
     {
+      name: "Gurbani",
+      href: "/gurbani",
+      icon: Library,
+    },
+    {
       name: "Messages",
       href: "/messages",
       icon: MessageSquare,
@@ -156,6 +161,11 @@ export function Sidebar({ className, ...props }: SidebarProps) {
       name: "Leaderboard",
       href: "/leaderboard",
       icon: Trophy,
+    },
+    {
+      name: "Gurbani",
+      href: "/gurbani",
+      icon: Library,
     },
     {
       name: "Profile",

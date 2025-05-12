@@ -141,3 +141,21 @@
     font-size: 16px !important; /* Ensure override */
   }
 }
+
+/* Gurbani Keyboard Theme Overrides */
+.hg-theme-default {
+  background-color: var(--card) !important;
+  border-radius: 0.5rem; /* match default rounded corners */
+}
+.hg-theme-default .hg-button {
+  background-color: var(--background) !important;
+  border-bottom: 1px solid var(--border) !important;
+  color: var(--foreground) !important;
+}
+.hg-theme-default .hg-button.hg-activeButton {
+  background-color: var(--muted) !important;
+}
+.hg-theme-default .hg-button.hg-selectedButton {
+  background-color: var(--primary) !important;
+  color: var(--primary-foreground) !important;
+}
