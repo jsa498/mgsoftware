@@ -5,8 +5,6 @@ import {
   Trophy,
   Search,
   RefreshCw,
-  Plus,
-  Minus,
   BarChart2,
   Clock,
   Calendar,
@@ -22,7 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { getPracticeLeaderboard, getQuizLeaderboard, updateQuizPoints, getActivePracticingSessions, getStudentPracticeHistory } from "@/lib/data-service";
+import { getPracticeLeaderboard, getActivePracticingSessions, getStudentPracticeHistory } from "@/lib/data-service";
 import { toast } from "@/components/ui/use-toast";
 import { isAdmin, getCurrentUser, User } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
@@ -50,13 +48,6 @@ type PracticeLeaderboardItem = {
   rank: number;
 };
 
-type QuizLeaderboardItem = {
-  student_id: string;
-  name: string;
-  points: number;
-  rank: number;
-};
-
 // Add type for practice history
 type PracticeHistoryItem = {
   id: string;
@@ -72,7 +63,6 @@ type PracticeHistoryItem = {
 export default function Leaderboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [practiceData, setPracticeData] = useState<PracticeLeaderboardItem[]>([]);
-  const [quizData, setQuizData] = useState<QuizLeaderboardItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [isUserAdmin, setIsUserAdmin] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -127,10 +117,7 @@ export default function Leaderboard() {
 
       // Fetch practice leaderboard for the month-to-date (or specific date)
       const practiceLeaderboard = await getPracticeLeaderboard(filterStartDate, filterEndDate);
-      const quizLeaderboard = await getQuizLeaderboard(filterEndDate);
-      
       setPracticeData(practiceLeaderboard);
-      setQuizData(quizLeaderboard);
       
       // Also update active practice sessions
       if (isAdmin()) {
@@ -168,31 +155,6 @@ export default function Leaderboard() {
       return () => clearInterval(intervalId);
     }
   }, [fetchLeaderboardData, fetchActivePracticingSessions]);
-  
-  // Function to update quiz points
-  const handleUpdateQuizPoints = async (studentId: string, increment: number) => {
-    try {
-      const success = await updateQuizPoints(studentId, increment);
-      
-      if (success) {
-        // Refresh leaderboard data
-        fetchLeaderboardData();
-        toast({
-          title: "Success",
-          description: `Quiz points ${increment > 0 ? "increased" : "decreased"} successfully.`,
-        });
-      } else {
-        throw new Error("Failed to update points");
-      }
-    } catch (error) {
-      console.error("Error updating quiz points:", error);
-      toast({
-        title: "Error",
-        description: "Failed to update quiz points. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
   
   // Function to handle calibrate points
   const handleCalibratePoints = async () => {
@@ -345,11 +307,6 @@ export default function Leaderboard() {
   const filteredPracticeData = practiceData.filter((student) =>
     student.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
-  
-  // Filter quiz data based on search query
-  const filteredQuizData = quizData.filter((student) =>
-    student.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
   return (
     <div className="p-2 md:p-6 space-y-4 md:space-y-6">
@@ -393,7 +350,6 @@ export default function Leaderboard() {
       <Tabs defaultValue="practice" className="w-full">
         <TabsList className="mb-4">
           <TabsTrigger value="practice">Practice</TabsTrigger>
-          <TabsTrigger value="quiz">Quiz</TabsTrigger>
         </TabsList>
         
         <TabsContent value="practice" className="rounded-lg border bg-card">
@@ -474,82 +430,6 @@ export default function Leaderboard() {
                               onClick={() => openTimeDialog(student.student_id)}
                             >
                               <Clock className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      )}
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          )}
-        </TabsContent>
-        
-        <TabsContent value="quiz" className="rounded-lg border bg-card">
-          {loading ? (
-            <div className="flex justify-center items-center h-64">
-              <p>Loading quiz data...</p>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[100px]">Rank</TableHead>
-                  <TableHead>Student</TableHead>
-                  <TableHead>Quiz Points</TableHead>
-                  {isUserAdmin && (
-                    <TableHead className="w-[130px]">Actions</TableHead>
-                  )}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredQuizData.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={isUserAdmin ? 4 : 3} className="text-center py-8">
-                      {quizData.length === 0
-                        ? "No quiz data available."
-                        : "No students match your search query."}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredQuizData.map((student) => (
-                    <TableRow key={student.student_id}>
-                      <TableCell className="font-medium">
-                        {student.rank === 1 ? (
-                          <div className="flex items-center justify-center bg-yellow-500 text-white w-8 h-8 rounded-full">
-                            <Trophy className="h-4 w-4" />
-                          </div>
-                        ) : student.rank === 2 ? (
-                          <div className="flex items-center justify-center bg-gray-400 text-white w-8 h-8 rounded-full">
-                            <Trophy className="h-4 w-4" />
-                          </div>
-                        ) : student.rank === 3 ? (
-                          <div className="flex items-center justify-center bg-amber-700 text-white w-8 h-8 rounded-full">
-                            <Trophy className="h-4 w-4" />
-                          </div>
-                        ) : (
-                          <div className="ml-3">#{student.rank}</div>
-                        )}
-                      </TableCell>
-                      <TableCell>{student.name}</TableCell>
-                      <TableCell>{student.points.toFixed(2)}</TableCell>
-                      {isUserAdmin && (
-                        <TableCell>
-                          <div className="flex space-x-2">
-                            <Button 
-                              variant="outline" 
-                              size="icon"
-                              onClick={() => handleUpdateQuizPoints(student.student_id, 0.5)}
-                            >
-                              <Plus className="h-4 w-4" />
-                            </Button>
-                            <Button 
-                              variant="outline" 
-                              size="icon"
-                              onClick={() => handleUpdateQuizPoints(student.student_id, -0.5)}
-                            >
-                              <Minus className="h-4 w-4" />
                             </Button>
                           </div>
                         </TableCell>
