@@ -48,6 +48,7 @@
     "react-dom": "^18.2.0",
     "react-hook-form": "^7.55.0",
     "react-simple-keyboard": "^3.8.71",
+    "recharts": "^2.15.3",
     "simple-keyboard": "^3.8.54",
     "tailwind-merge": "^3.0.2",
     "tw-animate-css": "^1.2.5",

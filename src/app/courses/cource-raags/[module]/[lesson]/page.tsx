@@ -5,6 +5,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { raags } from "../../raagsData";
+import { RaagPieChart } from "@/components/ui/RaagPieChart";
 
 interface LessonPageProps {
   params: { module: string; lesson: string };
@@ -149,24 +150,7 @@ export default async function LessonPage({ params }: LessonPageProps) {
           </TabsList>
 
           <TabsContent value="sudh">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {raags.sudh.map((raag) => (
-                <Card key={raag.name} className="hover:shadow-lg transition-shadow">
-                  <CardHeader>
-                    <CardTitle>{raag.name}</CardTitle>
-                    <CardDescription>{raag.time}</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="mb-2">{raag.description}</p>
-                    <div className="space-y-1 text-sm text-muted-foreground">
-                      <p><strong>Mood:</strong> {raag.mood}</p>
-                      <p><strong>Origin:</strong> {raag.origin}</p>
-                      <p><strong>Notes:</strong> {raag.notes}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+            <RaagPieChart data={raags.sudh} />
           </TabsContent>
 
           <TabsContent value="mishrat">
