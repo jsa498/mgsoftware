@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useMemo } from "react";
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
+import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import type { Raag } from "@/app/courses/cource-raags/raagsData";
 import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card"
 
@@ -9,46 +9,91 @@ interface RaagChartProps {
   data: Raag[];
 }
 
-// Map broad time categories to colors
-const categoryColors: Record<string, string> = {
-  dawn: "hsl(var(--chart-1))",
-  morning: "hsl(var(--chart-2))",
-  afternoon: "hsl(var(--chart-3))",
-  evening: "hsl(var(--chart-4))",
-  night: "hsl(var(--chart-5))",
-  midnight: "hsl(var(--chart-6))",
-  other: "hsl(var(--chart-7))",
+
+// Distinct colours for the eight 3-hour intervals.
+// Purely static hex palette.
+const sliceColors = [
+  "#E63946", // red
+  "#F4A261", // orange
+  "#2A9D8F", // teal
+  "#457B9D", // blue
+  "#8E44AD", // purple
+  "#E9C46A", // yellow
+  "#F72585", // pink
+  "#52B788", // green
+];
+
+// Map common Gurbani/Indian‑classical time descriptors to a 3‑hour bin index
+const keywordMap: Record<string, number> = {
+  "pre-dawn": 0,
+  "amrit vela": 0,
+  "brahm": 0,
+
+  "dawn": 1,
+  "early morning": 1,
+  "4 am": 1,
+
+  "morning": 2,
+
+  "late morning": 3,
+  "forenoon": 3,
+
+  "afternoon": 4,
+  "siesta": 4,
+
+  "late afternoon": 5,
+  "early evening": 5,
+
+  "evening": 6,
+  "sunset": 6,
+
+  "night": 7,
+  "midnight": 7,
 };
 
-function getTimeCategory(time: string): string {
-  const t = time.toLowerCase();
-  if (t.includes("pre-dawn") || t.includes("dawn") || t.includes("3 am") && t.includes("6 am")) return "dawn";
-  if (t.includes("6 am") || t.includes("9 am")) return "morning";
-  if (t.includes("12 pm") || t.includes("3 pm")) return "afternoon";
-  if (t.includes("6 pm")) return "evening";
-  if (t.includes("9 pm")) return "night";
-  if (t.includes("12 am")) return "midnight";
-  return "other";
-}
+// Utility: convert 12‑hr clock + meridiem to 24‑hr integer
+const to24 = (num: number, meridiem: string) => {
+  if (meridiem === "pm" && num !== 12) return num + 12;
+  if (meridiem === "am" && num === 12) return 0;
+  return num;
+};
 
-const CustomTooltip: React.FC<any> = ({ active, payload }) => {
-  if (active && payload && payload.length) {
-    const data: Raag & { timeCategory?: string } = payload[0].payload;
-    return (
-      <div className="bg-popover text-popover-foreground rounded p-4 shadow-lg">
-        <h4 className="font-semibold mb-1">{data.name}</h4>
-        <p className="text-sm mb-2">{data.description}</p>
-        <div className="space-y-1 text-xs text-muted-foreground">
-          <p><strong>Time:</strong> {data.time}</p>
-          <p><strong>Mood:</strong> {data.mood}</p>
-          <p><strong>Origin:</strong> {data.origin}</p>
-          <p><strong>Notes:</strong> {data.notes}</p>
-        </div>
-      </div>
-    );
+// Return the 0‑7 index a rāg belongs in
+function bucketIndex(timeStr: string): number {
+  // 1) explicit range that may omit one or both meridiems, e.g. "Evening 6-9 pm"
+  const flexible = /(\d{1,2})(?:\s*(am|pm))?[^\d]+(\d{1,2})(?:\s*(am|pm))?/i.exec(timeStr);
+  if (flexible) {
+    const sNum = +flexible[1];
+    const sMer = (flexible[2] || flexible[4] || "").toLowerCase(); // inherit end meridiem if start missing
+    const eNum = +flexible[3];
+    const eMer = (flexible[4] || flexible[2] || "").toLowerCase(); // inherit start meridiem if end missing
+
+    // If at least one meridiem is present we can resolve a 12‑hour clock; otherwise fall through
+    if (sMer || eMer) {
+      const start = to24(sNum, sMer || eMer);
+      let   end   = to24(eNum, eMer || sMer);
+      if (end <= start) end += 24;            // handle wrap‑around
+      const mid   = (start + end) / 2;
+      return Math.floor((mid % 24) / 3);
+    }
   }
-  return null;
-};
+
+  // 2) single anchor clock "at 6 am"
+  const single = /(\d{1,2})\s*(am|pm)/i.exec(timeStr);
+  if (single) {
+    const h = to24(+single[1], single[2].toLowerCase());
+    return Math.floor(h / 3);
+  }
+
+  // 3) keyword pass
+  const lc = timeStr.toLowerCase();
+  for (const [kw, idx] of Object.entries(keywordMap)) {
+    if (lc.includes(kw)) return idx;
+  }
+
+  // 4) hard fallback (9 pm‑12 am)
+  return 7;
+}
 
 export const RaagPieChart: React.FC<RaagChartProps> = ({ data }) => {
   // group into eight 3-hour bins
@@ -65,82 +110,130 @@ export const RaagPieChart: React.FC<RaagChartProps> = ({ data }) => {
 
   const intervalData = useMemo(() => {
     const bins = intervalLabels.map((label) => ({ label, raags: [] as Raag[] }));
-    const parseTimeRange = (time: string): [number, number] | null => {
-      const match = time.match(/(\d{1,2}\s*(?:am|pm))\s*-\s*(\d{1,2}\s*(?:am|pm))/i);
-      if (!match) return null;
-      const parseHour = (str: string) => {
-        const m = str.match(/(\d{1,2})\s*(am|pm)/i);
-        let h = m ? parseInt(m[1], 10) : 0;
-        const suffix = m ? m[2].toLowerCase() : "am";
-        if (suffix === "pm" && h !== 12) h += 12;
-        if (suffix === "am" && h === 12) h = 0;
-        return h;
-      };
-      let start = parseHour(match[1]);
-      let end = parseHour(match[2]);
-      if (end <= start) end += 24;
-      return [start, end];
-    };
 
     data.forEach((r) => {
-      const range = parseTimeRange(r.time);
-      const midHour = range ? ((range[0] + range[1]) / 2) % 24 : 22;
-      const idx = Math.floor(midHour / 3);
+      const idx = bucketIndex(r.time);
       bins[idx].raags.push(r);
     });
 
-    return bins.map((b) => ({ label: b.label, value: b.raags.length, raags: b.raags }));
+    return bins.map((b, idx) => ({
+      label: b.label,
+      value: 1,
+      raags: b.raags,
+      colour: sliceColors[idx],
+    }));
   }, [data]);
 
   const renderLabels = ({ cx, cy, midAngle, outerRadius, payload }: any) => {
-    return (payload.raags as Raag[]).map((r, i) => {
-      const RAD = Math.PI / 180;
-      const offset = outerRadius + 20 + i * 16;
-      const x = cx + offset * Math.cos(-midAngle * RAD);
-      const y = cy + offset * Math.sin(-midAngle * RAD);
+    const RAD = Math.PI / 180;
+
+    // Normalize angle to 0‑360 then flip upside‑down values so text stays upright
+    const uprightAngle = (deg: number) => {
+      const norm = ((deg % 360) + 360) % 360;
+      return norm > 90 && norm < 270 ? deg + 180 : deg;
+    };
+
+    // Offset at which we’ll draw the slice’s time label
+    const timeOffset = outerRadius + 30;   // more clearance outside the ring
+
+    // Build one <text> element per rāg in this slice
+    const raagLabels = (payload.raags as Raag[]).map((r, i) => {
+      const lineHeight   = 15;
+      const radialOffset = outerRadius * 0.45 + i * lineHeight;
+
+      // --- position: still along the slice radius ---
+      const radialCoordDeg = -midAngle;           // convert Recharts CW to SVG CCW
+      const x = cx + radialOffset * Math.cos(radialCoordDeg * RAD);
+      const y = cy + radialOffset * Math.sin(radialCoordDeg * RAD);
+
+      // --- orientation: tangent to the ring (same as time label) ---
+      const tangentDeg   = midAngle + 90;         // CW tangent
+      const textRotation = uprightAngle(tangentDeg);
+
       return (
-        <HoverCard key={`label-${payload.label}-${r.name}`}>
+        <HoverCard key={`${payload.label}-${r.name}`}>
           <HoverCardTrigger asChild>
             <text
               x={x}
               y={y}
-              fill="#000"
+              transform={`rotate(${textRotation} ${x} ${y})`}
               textAnchor="middle"
               dominantBaseline="middle"
-              style={{ fontSize: 12, cursor: "pointer" }}
-              transform={`rotate(${-midAngle} ${x},${y})`}
+              style={{
+                fontSize: 12,
+                cursor: "pointer",
+                fill: "#fff",
+                paintOrder: "stroke",
+                stroke: "rgba(0,0,0,0.6)",
+                strokeWidth: 2,
+              }}
+              className="select-none"
             >
               {r.name}
             </text>
           </HoverCardTrigger>
+
           <HoverCardContent>
             <h4 className="font-semibold mb-1">{r.name}</h4>
             <p className="text-sm mb-2">{r.description}</p>
             <div className="space-y-1 text-xs text-muted-foreground">
-              <p><strong>Time:</strong> {r.time}</p>
-              <p><strong>Mood:</strong> {r.mood}</p>
-              <p><strong>Origin:</strong> {r.origin}</p>
-              <p><strong>Notes:</strong> {r.notes}</p>
+              <p>
+                <strong>Time:</strong> {r.time}
+              </p>
+              <p>
+                <strong>Mood:</strong> {r.mood}
+              </p>
+              <p>
+                <strong>Origin:</strong> {r.origin}
+              </p>
+              <p>
+                <strong>Notes:</strong> {r.notes}
+              </p>
             </div>
           </HoverCardContent>
         </HoverCard>
       );
     });
+
+    // ----- time‑range label (tangent to the ring) -----
+    // radial angle in degrees (SVG uses clockwise, 0° at 3 o’clock)
+    const radialDeg = midAngle;            // raw Recharts angle (clockwise)
+    // tangent is radial + 90°
+    const tangentDeg = radialDeg + 90;     // tangent = radial + 90°
+    const timeAngle  = uprightAngle(tangentDeg);
+
+    const tx = cx + timeOffset * Math.cos(radialDeg * RAD);
+    const ty = cy + timeOffset * Math.sin(radialDeg * RAD);
+
+    const timeLabel = (
+      <text
+        x={tx}
+        y={ty}
+        transform={`rotate(${timeAngle} ${tx} ${ty})`}
+        textAnchor="middle"
+        dominantBaseline="middle"
+        style={{ fontSize: 11, fill: "#000", fontWeight: 600 }}
+        className="select-none"
+      >
+        {payload.label}
+      </text>
+    );
+
+    // Recharts expects a single React element back
+    return <g>{timeLabel}{raagLabels}</g>;
   };
 
   return (
-    <ResponsiveContainer width="100%" height={500}>
+    <ResponsiveContainer width="100%" height={600}>
       <PieChart>
-        <Tooltip content={<CustomTooltip />} />
         <Pie
           data={intervalData}
           dataKey="value"
           nameKey="label"
           startAngle={90}
           endAngle={-270}
-          innerRadius="40%"
-          outerRadius="80%"
-          isAnimationActive={false}
+          innerRadius="35%"
+          outerRadius="85%"
           paddingAngle={0}
           labelLine={false}
           label={renderLabels}
@@ -148,11 +241,11 @@ export const RaagPieChart: React.FC<RaagChartProps> = ({ data }) => {
           {intervalData.map((entry, idx) => (
             <Cell
               key={`cell-${idx}`}
-              fill={categoryColors[getTimeCategory(entry.label)] || categoryColors.other}
+              fill={entry.colour}
             />
           ))}
         </Pie>
       </PieChart>
     </ResponsiveContainer>
   );
-}; 
+};

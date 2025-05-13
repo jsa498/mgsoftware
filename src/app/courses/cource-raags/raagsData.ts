@@ -12,7 +12,7 @@ export const raags: { sudh: Raag[]; mishrat: Raag[] } = {
     {
       name: "Siree (Sri)",
       description: "The first Raag in Guru Granth Sahib Ji. It represents the morning hours and is associated with devotion and meditation. This Raag is considered the king of all Raags.",
-      time: "Evening 6-9 pm",
+      time: "Evening 6 pm-9 pm",
       mood: "Deep devotion, humility",
       origin: "Ancient Indian Classical Music",
       notes: "Sa Re Ma Pa Ni Sa (Aroha), Sa Ni Dha Pa Ma Ga Re Sa (Avroha)"
@@ -20,7 +20,7 @@ export const raags: { sudh: Raag[]; mishrat: Raag[] } = {
     {
       name: "Maajh",
       description: "A Raag that represents the mid-day hours. It is associated with courage and strength. This Raag is often used for expressing deep spiritual emotions.",
-      time: "Late afternoon 3-6 pm",
+      time: "Late afternoon 3 pm-6 pm",
       mood: "Yearning, loving dialogue",
       origin: "Ancient Indian Classical Music",
       notes: "Sa Re Ga Ma Pa Dha Ni Sa"
@@ -28,7 +28,7 @@ export const raags: { sudh: Raag[]; mishrat: Raag[] } = {
     {
       name: "Gauree",
       description: "A Raag that represents the evening hours. It is associated with wisdom and knowledge. This Raag is known for its calming and meditative qualities.",
-      time: "Early afternoon 12-3 pm",
+      time: "Early afternoon 12 pm-3 pm",
       mood: "Serious reflection, clarity",
       origin: "Ancient Indian Classical Music",
       notes: "Sa Re Ga Ma Pa Dha Ni Sa"
@@ -36,7 +36,7 @@ export const raags: { sudh: Raag[]; mishrat: Raag[] } = {
     {
       name: "Asaa",
       description: "A Raag that represents the early morning hours. It is associated with hope and optimism. This Raag is particularly popular in morning prayers.",
-      time: "Dawn 3-6 am",
+      time: "Dawn 3 am-6 am",
       mood: "Hope, inspiration",
       origin: "Ancient Indian Classical Music",
       notes: "Sa Re Ga Ma Pa Dha Ni Sa"
@@ -44,7 +44,7 @@ export const raags: { sudh: Raag[]; mishrat: Raag[] } = {
     {
       name: "Gujree",
       description: "A Raag that represents the late morning hours. It is associated with humility and devotion. This Raag is known for its devotional nature.",
-      time: "Morning 6-9 am",
+      time: "Morning 6 am-9 am",
       mood: "Meditation, quiet joy",
       origin: "Ancient Indian Classical Music",
       notes: "Sa Re Ga Ma Pa Dha Ni Sa"
@@ -52,7 +52,7 @@ export const raags: { sudh: Raag[]; mishrat: Raag[] } = {
     {
       name: "Devgandhaaree",
       description: "A Raag that represents the late evening hours. It is associated with peace and tranquility. This Raag is known for its soothing and calming effect.",
-      time: "Morning 6-9 am",
+      time: "Morning 6 am-9 am",
       mood: "Sweet compassion",
       origin: "Ancient Indian Classical Music",
       notes: "Sa Re Ga Ma Pa Dha Ni Sa"
@@ -68,7 +68,7 @@ export const raags: { sudh: Raag[]; mishrat: Raag[] } = {
     {
       name: "Vadhans",
       description: "A Raag that represents the early morning hours. It is associated with awakening and new beginnings.",
-      time: "Mid-day 12-3 pm",
+      time: "Mid-day 12 pm-3 pm",
       mood: "Mixed joy-sorrow (wedding/dirge)",
       origin: "Ancient Indian Classical Music",
       notes: "Sa Re Ga Ma Pa Dha Ni Sa"
@@ -108,7 +108,7 @@ export const raags: { sudh: Raag[]; mishrat: Raag[] } = {
     {
       name: "Bhairav",
       description: "A Raag that represents the morning hours. It is associated with devotion and spiritual connection. This Raag is known for its devotional nature.",
-      time: "Pre-dawn 3-6 am",
+      time: "Pre-dawn 3 am-6 am",
       mood: "Awe, solemnity",
       origin: "Ancient Indian Classical Music",
       notes: "Sa Re Ga Ma Pa Dha Ni Sa"
@@ -116,7 +116,7 @@ export const raags: { sudh: Raag[]; mishrat: Raag[] } = {
     {
       name: "Tilang",
       description: "A Raag that represents the evening hours. It is associated with love and devotion. This Raag is known for its romantic and devotional qualities.",
-      time: "Evening 6-9 pm",
+      time: "Evening 6 pm-9 pm",
       mood: "Gentle love",
       origin: "Ancient Indian Classical Music",
       notes: "Sa Re Ga Ma Pa Dha Ni Sa"
@@ -132,7 +132,7 @@ export const raags: { sudh: Raag[]; mishrat: Raag[] } = {
     {
       name: "Bilaaval",
       description: "A Raag that represents the morning hours. It is associated with joy and happiness. This Raag is known for its bright and cheerful nature.",
-      time: "Morning 6-9 am",
+      time: "Morning 6 am-9 am",
       mood: "Cheerful brightness",
       origin: "Ancient Indian Classical Music",
       notes: "Sa Re Ga Ma Pa Dha Ni Sa"
@@ -140,7 +140,7 @@ export const raags: { sudh: Raag[]; mishrat: Raag[] } = {
     {
       name: "Gaund",
       description: "A Raag that represents the evening hours. It is associated with devotion and love. This Raag is known for its romantic and devotional qualities.",
-      time: "Morning 6-9 am",
+      time: "Morning 6 am-9 am",
       mood: "Wonder, mysticism",
       origin: "Ancient Indian Classical Music",
       notes: "Sa Re Ga Ma Pa Dha Ni Sa"
@@ -148,7 +148,7 @@ export const raags: { sudh: Raag[]; mishrat: Raag[] } = {
     {
       name: "Raamkalee",
       description: "A Raag that represents the morning hours. It is associated with peace and tranquility. This Raag is known for its calming and soothing effect.",
-      time: "Midnight 12-3 am",
+      time: "Midnight 12 am-3 am",
       mood: "Transformation, discipline",
       origin: "Ancient Indian Classical Music",
       notes: "Sa Re Ga Ma Pa Dha Ni Sa"
@@ -172,7 +172,7 @@ export const raags: { sudh: Raag[]; mishrat: Raag[] } = {
     {
       name: "Maaroo",
       description: "A Raag that represents the evening hours. It is associated with courage and strength. This Raag is known for its powerful and energetic nature.",
-      time: "Early afternoon 12-3 pm",
+      time: "Early afternoon 12 pm-3 pm",
       mood: "Heroic zeal",
       origin: "Ancient Indian Classical Music",
       notes: "Sa Re Ga Ma Pa Dha Ni Sa"
@@ -180,7 +180,7 @@ export const raags: { sudh: Raag[]; mishrat: Raag[] } = {
     {
       name: "Tukharee",
       description: "A Raag that represents the morning hours. It is associated with devotion and spiritual connection. This Raag is known for its devotional nature.",
-      time: "Early afternoon 12-3 pm",
+      time: "Early afternoon 12 pm-3 pm",
       mood: "Divine protection",
       origin: "Ancient Indian Classical Music",
       notes: "Sa Re Ga Ma Pa Dha Ni Sa"
@@ -188,7 +188,7 @@ export const raags: { sudh: Raag[]; mishrat: Raag[] } = {
     {
       name: "Kedaaraa",
       description: "A Raag that represents the night hours. It is associated with peace and tranquility. This Raag is known for its calming and soothing effect.",
-      time: "Late night 12-3 am",
+      time: "Late night 12 am-3 am",
       mood: "Compassionate calm",
       origin: "Ancient Indian Classical Music",
       notes: "Sa Re Ga Ma Pa Dha Ni Sa"
@@ -196,7 +196,7 @@ export const raags: { sudh: Raag[]; mishrat: Raag[] } = {
     {
       name: "Bhairon",
       description: "A Raag that represents the morning hours. It is associated with courage and determination. This Raag is known for its serious and profound nature.",
-      time: "Pre-dawn 3-6 am",
+      time: "Pre-dawn 3 am-6 am",
       mood: "Fearless grandeur",
       origin: "Ancient Indian Classical Music",
       notes: "Sa Re Ga Ma Pa Dha Ni Sa"
@@ -204,7 +204,7 @@ export const raags: { sudh: Raag[]; mishrat: Raag[] } = {
     {
       name: "Basant",
       description: "A Raag that represents the spring season. It is associated with joy and celebration. This Raag is particularly popular during the spring festival of Vaisakhi.",
-      time: "Evening 6-9 pm",
+      time: "Evening 6 pm-9 pm",
       mood: "Renewal, spring joy",
       origin: "Ancient Indian Classical Music",
       notes: "Sa Re Ga Ma Pa Dha Ni Sa"
@@ -212,7 +212,7 @@ export const raags: { sudh: Raag[]; mishrat: Raag[] } = {
     {
       name: "Sarang",
       description: "A Raag that represents the summer season. It is associated with energy and enthusiasm. This Raag is known for its bright and energetic nature.",
-      time: "Mid-day 12-3 pm",
+      time: "Mid-day 12 pm-3 pm",
       mood: "Soothing relief (rain)",
       origin: "Ancient Indian Classical Music",
       notes: "Sa Re Ga Ma Pa Dha Ni Sa"
@@ -228,7 +228,7 @@ export const raags: { sudh: Raag[]; mishrat: Raag[] } = {
     {
       name: "Kaanraa",
       description: "A Raag that represents the autumn season. It is associated with wisdom and maturity. This Raag is known for its deep and profound nature.",
-      time: "Late night 12-3 am",
+      time: "Late night 12 am-3 am",
       mood: "Philosophical depth",
       origin: "Ancient Indian Classical Music",
       notes: "Sa Re Ga Ma Pa Dha Ni Sa"
@@ -236,7 +236,7 @@ export const raags: { sudh: Raag[]; mishrat: Raag[] } = {
     {
       name: "Kalyan",
       description: "A Raag that represents the evening hours. It is associated with peace and tranquility. This Raag is known for its calming and soothing effect.",
-      time: "Late night 12-3 am",
+      time: "Late night 12 am-3 am",
       mood: "Auspicious celebration",
       origin: "Ancient Indian Classical Music",
       notes: "Sa Re Ga Ma Pa Dha Ni Sa"
@@ -244,7 +244,7 @@ export const raags: { sudh: Raag[]; mishrat: Raag[] } = {
     {
       name: "Parbhaatee",
       description: "A Raag that represents the early morning hours. It is associated with awakening and new beginnings. This Raag is known for its uplifting nature.",
-      time: "Pre-sunrise 3-6 am",
+      time: "Pre-sunrise 3 am-6 am",
       mood: "Enlightened awakening",
       origin: "Ancient Indian Classical Music",
       notes: "Sa Re Ga Ma Pa Dha Ni Sa"
