@@ -11,16 +11,16 @@ interface RaagChartProps {
 
 
 // Distinct colours for the eight 3-hour intervals.
-// Purely static hex palette.
+// Lighter pastel palette.
 const sliceColors = [
-  "#E63946", // red
-  "#F4A261", // orange
-  "#2A9D8F", // teal
-  "#457B9D", // blue
-  "#8E44AD", // purple
-  "#E9C46A", // yellow
-  "#F72585", // pink
-  "#52B788", // green
+  "#fca5a5", // light red
+  "#d9f99d", // light lime
+  "#fecaca", // light pink
+  "#fde68a", // light amber
+  "#e9d5ff", // light lavender
+  "#c7d2fe", // light indigo
+  "#a5f3fc", // light cyan
+  "#fed7aa", // light peach
 ];
 
 // Map common Gurbani/Indian‑classical time descriptors to a 3‑hour bin index
@@ -121,7 +121,7 @@ export const RaagPieChart: React.FC<RaagChartProps> = ({ data }) => {
       value: 1,
       raags: b.raags,
       colour: sliceColors[idx],
-    }));
+    })).reverse();         // draw slices clockwise
   }, [data]);
 
   const renderLabels = ({ cx, cy, midAngle, outerRadius, payload }: any) => {
@@ -136,19 +136,32 @@ export const RaagPieChart: React.FC<RaagChartProps> = ({ data }) => {
     // Offset at which we’ll draw the slice’s time label
     const timeOffset = outerRadius + 30;   // more clearance outside the ring
 
-    // Build one <text> element per rāg in this slice
-    const raagLabels = (payload.raags as Raag[]).map((r, i) => {
-      const lineHeight   = 15;
-      const radialOffset = outerRadius * 0.45 + i * lineHeight;
+    const raagLabels = (payload.raags as Raag[]).map((r, i, arr) => {
+      const lineHeight = 26;          // vertical spacing between rāg names
 
-      // --- position: still along the slice radius ---
-      const radialCoordDeg = -midAngle;           // convert Recharts CW to SVG CCW
-      const x = cx + radialOffset * Math.cos(radialCoordDeg * RAD);
-      const y = cy + radialOffset * Math.sin(radialCoordDeg * RAD);
+      // Centre the group of names between the inner and outer radii
+      const innerRadius = outerRadius * 0.3889;                     // 35 % / 90 % ratio
+      const midDepth    = (outerRadius + innerRadius) / 2;          // midway between rims
+      const n           = (payload.raags as Raag[]).length;
+      const startDepth  = midDepth + ((n - 1) / 2) * lineHeight;    // first (outermost) label depth
+      const depth       = startDepth - i * lineHeight;              // progressively inward
 
-      // --- orientation: tangent to the ring (same as time label) ---
-      const tangentDeg   = midAngle + 90;         // CW tangent
-      const textRotation = uprightAngle(tangentDeg);
+      /*  --- tangent positioning ---
+          radial unit  (ux, uy)
+          tangent unit (tx, ty) = (-uy, ux)
+      */
+      const radDeg = midAngle;        // Recharts gives clockwise angle
+      const radRad = radDeg * RAD;
+      const ux = Math.cos(radRad);
+      const uy = Math.sin(radRad);
+      const tx = -uy;
+      const ty =  ux;
+
+      // --- position: go progressively inward along the slice bisector ---
+      const x = cx + ux * depth;
+      const y = cy + uy * depth;
+
+      const textRotation = uprightAngle(radDeg + 90); // tangent
 
       return (
         <HoverCard key={`${payload.label}-${r.name}`}>
@@ -160,12 +173,10 @@ export const RaagPieChart: React.FC<RaagChartProps> = ({ data }) => {
               textAnchor="middle"
               dominantBaseline="middle"
               style={{
-                fontSize: 12,
+                fontSize: 20,
+                fontWeight: 600,
                 cursor: "pointer",
-                fill: "#fff",
-                paintOrder: "stroke",
-                stroke: "rgba(0,0,0,0.6)",
-                strokeWidth: 2,
+                fill: "#000000",          // solid black for best contrast on pastel slices
               }}
               className="select-none"
             >
@@ -177,18 +188,10 @@ export const RaagPieChart: React.FC<RaagChartProps> = ({ data }) => {
             <h4 className="font-semibold mb-1">{r.name}</h4>
             <p className="text-sm mb-2">{r.description}</p>
             <div className="space-y-1 text-xs text-muted-foreground">
-              <p>
-                <strong>Time:</strong> {r.time}
-              </p>
-              <p>
-                <strong>Mood:</strong> {r.mood}
-              </p>
-              <p>
-                <strong>Origin:</strong> {r.origin}
-              </p>
-              <p>
-                <strong>Notes:</strong> {r.notes}
-              </p>
+              <p><strong>Time:</strong> {r.time}</p>
+              <p><strong>Mood:</strong> {r.mood}</p>
+              <p><strong>Origin:</strong> {r.origin}</p>
+              <p><strong>Notes:</strong> {r.notes}</p>
             </div>
           </HoverCardContent>
         </HoverCard>
@@ -212,8 +215,8 @@ export const RaagPieChart: React.FC<RaagChartProps> = ({ data }) => {
         transform={`rotate(${timeAngle} ${tx} ${ty})`}
         textAnchor="middle"
         dominantBaseline="middle"
-        style={{ fontSize: 11, fill: "#000", fontWeight: 600 }}
-        className="select-none"
+        style={{ fontSize: 13, fontWeight: 600, fill: "currentColor" }}
+        className="select-none text-foreground"
       >
         {payload.label}
       </text>
@@ -224,7 +227,7 @@ export const RaagPieChart: React.FC<RaagChartProps> = ({ data }) => {
   };
 
   return (
-    <ResponsiveContainer width="100%" height={600}>
+    <ResponsiveContainer width="100%" height={700}>
       <PieChart>
         <Pie
           data={intervalData}
@@ -233,7 +236,7 @@ export const RaagPieChart: React.FC<RaagChartProps> = ({ data }) => {
           startAngle={90}
           endAngle={-270}
           innerRadius="35%"
-          outerRadius="85%"
+          outerRadius="90%"
           paddingAngle={0}
           labelLine={false}
           label={renderLabels}
