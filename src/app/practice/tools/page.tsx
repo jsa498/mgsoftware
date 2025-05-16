@@ -138,32 +138,20 @@ export default function PracticeToolsPage() {
     if (timerRef.current) {
       clearInterval(timerRef.current)
     }
-    
-    // Store the current time as last update time
-    lastUpdateTimeRef.current = new Date()
-    
+
+    // Set up interval to recalculate elapsed time based on session start
     timerRef.current = setInterval(() => {
-      // Calculate elapsed time since last update
-      const now = new Date()
-      const elapsed = lastUpdateTimeRef.current 
-        ? Math.floor((now.getTime() - lastUpdateTimeRef.current.getTime()) / 1000)
-        : 1 // Default to 1 second if no last update time
-      
-      lastUpdateTimeRef.current = now
-      
-      setPracticeTime(prev => {
-        const newTime = prev + elapsed
-        // Update points (2 points per hour)
-        setPracticePoints(calculatePoints(newTime))
-        
-        // Update session in database every minute
-        if (Math.floor(newTime / 60) > Math.floor(prev / 60) && sessionId) {
-          updatePracticeSession(sessionId, Math.floor(newTime / 60))
-            .catch(err => console.error('Error updating session:', err))
-        }
-        
-        return newTime
-      })
+      if (!sessionStartTimeRef.current) return
+      const now = Date.now()
+      const startMs = sessionStartTimeRef.current.getTime()
+      const elapsedSeconds = Math.floor((now - startMs) / 1000)
+      setPracticeTime(elapsedSeconds)
+      setPracticePoints(calculatePoints(elapsedSeconds))
+      // Update DB every full minute of elapsed time
+      if (sessionId && Math.floor(elapsedSeconds / 60) > Math.floor((elapsedSeconds - 1) / 60)) {
+        updatePracticeSession(sessionId, Math.floor(elapsedSeconds / 60))
+          .catch(err => console.error('Error updating session:', err))
+      }
     }, 1000)
   }, [sessionId, calculatePoints])
   
@@ -368,41 +356,32 @@ export default function PracticeToolsPage() {
   // Handle visibility changes
   useEffect(() => {
     if (!isPlaying) return
-    
+
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        // Tab is visible again, update the timer
-        if (sessionId && lastUpdateTimeRef.current) {
-          const now = new Date()
-          const elapsed = Math.floor((now.getTime() - lastUpdateTimeRef.current.getTime()) / 1000)
-          
-          // Only update if significant time has passed (more than 2 seconds)
-          if (elapsed > 2) {
-            setPracticeTime(prev => {
-              const newTime = prev + elapsed
-              setPracticePoints(calculatePoints(newTime))
-              
-              // Update session in database if minutes changed
-              if (Math.floor(newTime / 60) > Math.floor(prev / 60)) {
-                updatePracticeSession(sessionId, Math.floor(newTime / 60))
-                  .catch(err => console.error('Error updating session:', err))
-              }
-              
-              return newTime
-            })
+      if (document.visibilityState === 'visible' && sessionStartTimeRef.current) {
+        const now = Date.now()
+        const startMs = sessionStartTimeRef.current.getTime()
+        const elapsedSeconds = Math.floor((now - startMs) / 1000)
+
+        // Only update if lag is more than 2 seconds behind
+        if (elapsedSeconds > practiceTime + 2) {
+          setPracticeTime(elapsedSeconds)
+          setPracticePoints(calculatePoints(elapsedSeconds))
+          // Update DB every full minute of elapsed time
+          if (sessionId && Math.floor(elapsedSeconds / 60) > Math.floor(practiceTime / 60)) {
+            updatePracticeSession(sessionId, Math.floor(elapsedSeconds / 60))
+              .catch(err => console.error('Error updating session:', err))
           }
-          
-          lastUpdateTimeRef.current = now
         }
       }
     }
-    
+
     document.addEventListener('visibilitychange', handleVisibilityChange)
-    
+
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [isPlaying, sessionId, calculatePoints])
+  }, [isPlaying, sessionId, practiceTime, calculatePoints])
   
   // Start practice session
   const handleStartPractice = async () => {
@@ -457,18 +436,25 @@ export default function PracticeToolsPage() {
   const handleStopPractice = async () => {
     try {
       if (!sessionId) return
-      
+
       stopTimer()
       setIsPlaying(false)
-      
+
+      // Recalculate actual elapsed time to avoid timer drift
+      const actualSeconds = sessionStartTimeRef.current
+        ? Math.floor((Date.now() - sessionStartTimeRef.current.getTime()) / 1000)
+        : practiceTime
+      setPracticeTime(actualSeconds)
+      setPracticePoints(calculatePoints(actualSeconds))
+
       // Convert seconds to minutes (rounding up to nearest 0.01)
-      const durationMinutes = Math.ceil(practiceTime / 60 * 100) / 100
-      
+      const durationMinutes = Math.ceil((actualSeconds / 60) * 100) / 100
+
       const result = await completePracticeSession(sessionId, durationMinutes)
       if (result.success) {
         setCompletionData({
-          duration: formatTime(practiceTime),
-          points: practicePoints.toFixed(2),
+          duration: formatTime(actualSeconds),
+          points: calculatePoints(actualSeconds).toFixed(2),
           durationMinutes,
         })
         setPracticeCompleted(true)
