@@ -190,7 +190,8 @@ export const RaagPieChart: React.FC<RaagChartProps> = ({ data }) => {
             <div className="space-y-1 text-xs text-muted-foreground">
               <p><strong>Time:</strong> {r.time}</p>
               <p><strong>Mood:</strong> {r.mood}</p>
-              <p><strong>Notes:</strong> {r.notes}</p>
+              <p><strong>Aroha:</strong> {r.aroha}</p>
+              <p><strong>Avroha:</strong> {r.avroha}</p>
             </div>
           </HoverCardContent>
         </HoverCard>
