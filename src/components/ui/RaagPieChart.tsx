@@ -133,14 +133,14 @@ export const RaagPieChart: React.FC<RaagChartProps> = ({ data }) => {
       return norm > 90 && norm < 270 ? deg + 180 : deg;
     };
 
-    // Offset at which we’ll draw the slice’s time label
+    // Offset at which we'll draw the slice's time label
     const timeOffset = outerRadius + 30;   // more clearance outside the ring
 
     const raagLabels = (payload.raags as Raag[]).map((r, i, arr) => {
       const lineHeight = 26;          // vertical spacing between rāg names
 
       // Centre the group of names between the inner and outer radii
-      const innerRadius = outerRadius * 0.3889;                     // 35 % / 90 % ratio
+      const innerRadius = outerRadius * 0.3889;                     // 35 % / 90 % ratio
       const midDepth    = (outerRadius + innerRadius) / 2;          // midway between rims
       const n           = (payload.raags as Raag[]).length;
       const startDepth  = midDepth + ((n - 1) / 2) * lineHeight;    // first (outermost) label depth
@@ -190,7 +190,6 @@ export const RaagPieChart: React.FC<RaagChartProps> = ({ data }) => {
             <div className="space-y-1 text-xs text-muted-foreground">
               <p><strong>Time:</strong> {r.time}</p>
               <p><strong>Mood:</strong> {r.mood}</p>
-              <p><strong>Origin:</strong> {r.origin}</p>
               <p><strong>Notes:</strong> {r.notes}</p>
             </div>
           </HoverCardContent>
@@ -199,7 +198,7 @@ export const RaagPieChart: React.FC<RaagChartProps> = ({ data }) => {
     });
 
     // ----- time‑range label (tangent to the ring) -----
-    // radial angle in degrees (SVG uses clockwise, 0° at 3 o’clock)
+    // radial angle in degrees (SVG uses clockwise, 0° at 3 o'clock)
     const radialDeg = midAngle;            // raw Recharts angle (clockwise)
     // tangent is radial + 90°
     const tangentDeg = radialDeg + 90;     // tangent = radial + 90°

@@ -165,7 +165,6 @@ export default async function LessonPage({ params }: LessonPageProps) {
                     <p className="mb-2">{raag.description}</p>
                     <div className="space-y-1 text-sm text-muted-foreground">
                       <p><strong>Mood:</strong> {raag.mood}</p>
-                      <p><strong>Origin:</strong> {raag.origin}</p>
                       <p><strong>Notes:</strong> {raag.notes}</p>
                     </div>
                   </CardContent>
