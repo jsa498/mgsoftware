@@ -35,9 +35,32 @@ interface FeatureRequest {
   updated_at: string
 }
 
+interface PracticeRequest {
+  id: string
+  student_id: string
+  session_id: string
+  title: string
+  details: string
+  status: 'pending' | 'approved' | 'rejected'
+  created_at: string
+  updated_at: string
+  requestType: 'practice'
+}
+
+interface QuizRequest {
+  id: string
+  student_id: string
+  title: string
+  details: string
+  status: 'pending' | 'approved' | 'rejected'
+  created_at: string
+  updated_at: string
+  requestType: 'quiz'
+}
+
 export default function StudentRequestsPage() {
   const [isLoading, setIsLoading] = useState(true)
-  const [requests, setRequests] = useState<FeatureRequest[]>([])
+  const [requests, setRequests] = useState<(FeatureRequest | PracticeRequest | QuizRequest)[]>([])
   const [openDialog, setOpenDialog] = useState(false)
   const [studentId, setStudentId] = useState<string | null>(null)
   const [currentPin, setCurrentPin] = useState<string>("")
@@ -53,8 +76,10 @@ export default function StudentRequestsPage() {
   )
   
   // Filter requests by type
-  const featureAndBugRequests = requests.filter(req => req.type === 'feature' || req.type === 'bug')
-  const pinChangeRequests = requests.filter(req => req.type === 'pin')
+  const featureAndBugRequests = requests.filter(req => 'type' in req && (req.type === 'feature' || req.type === 'bug')) as FeatureRequest[]
+  const pinChangeRequests = requests.filter(req => 'type' in req && req.type === 'pin') as FeatureRequest[]
+  const practiceRetryRequests = requests.filter(req => 'requestType' in req && req.requestType === 'practice') as PracticeRequest[]
+  const quizRetryRequests = requests.filter(req => 'requestType' in req && req.requestType === 'quiz') as QuizRequest[]
 
   // Fetch the current user's ID
   const fetchUserData = async () => {
@@ -88,17 +113,57 @@ export default function StudentRequestsPage() {
     setIsLoading(true)
     
     try {
-      const { data, error } = await supabase
+      // Fetch feature requests
+      const { data: featureData, error: featErr } = await supabase
         .from('feature_requests')
         .select('*')
         .eq('student_id', id)
         .order('created_at', { ascending: false });
       
-      if (error) throw error;
+      if (featErr) throw featErr;
       
-      setRequests(data || []);
+      // Fetch practice retry requests
+      const { data: practiceData, error: practErr } = await supabase
+        .from('practice_retry_requests')
+        .select('*')
+        .eq('student_id', id)
+        .order('created_at', { ascending: false });
+      
+      if (practErr && practErr.code !== 'PGRST116') throw practErr;
+      
+      // Fetch quiz retry requests (if the table exists)
+      const { data: quizData, error: quizErr } = await supabase
+        .from('quiz_retry_requests')
+        .select('*')
+        .eq('student_id', id)
+        .order('created_at', { ascending: false });
+      
+      if (quizErr && quizErr.code !== 'PGRST116') throw quizErr;
+      
+      // Combine all request types
+      let allRequests = [...(featureData || [])];
+      
+      // Add practice retry requests with requestType property
+      if (practiceData) {
+        const practiceRequests = practiceData.map(req => ({
+          ...req,
+          requestType: 'practice'
+        }));
+        allRequests = [...allRequests, ...practiceRequests];
+      }
+      
+      // Add quiz retry requests with requestType property
+      if (quizData) {
+        const quizRequests = quizData.map(req => ({
+          ...req,
+          requestType: 'quiz'
+        }));
+        allRequests = [...allRequests, ...quizRequests];
+      }
+      
+      setRequests(allRequests);
     } catch (error) {
-      console.error('Error fetching feature requests:', error);
+      console.error('Error fetching requests:', error);
     } finally {
       setIsLoading(false);
     }
@@ -301,8 +366,8 @@ export default function StudentRequestsPage() {
     )
   }
 
-  // Render other requests or empty state - used for quiz and practice retry requests
-  const renderRequestsOrEmpty = (emptyMessage: string) => {
+  // Render practice retry requests
+  const renderPracticeRequests = () => {
     if (isLoading) {
       return (
         <div className="space-y-3">
@@ -312,9 +377,99 @@ export default function StudentRequestsPage() {
       )
     }
     
+    if (practiceRetryRequests.length === 0) {
+      return (
+        <div className="py-6 text-center text-muted-foreground">
+          No pending practice retry requests
+        </div>
+      )
+    }
+    
     return (
-      <div className="py-6 text-center text-muted-foreground">
-        {emptyMessage}
+      <div className="space-y-3 max-h-[420px] overflow-y-auto pr-2">
+        {practiceRetryRequests.map(request => (
+          <div key={request.id}>
+            <div className="flex justify-between items-center">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">{request.title}</p>
+                {request.details && (
+                  <p className="text-xs text-muted-foreground">
+                    {request.details}
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Submitted on {new Date(request.created_at).toLocaleDateString()}
+                </p>
+              </div>
+              <Badge 
+                variant={
+                  request.status === 'rejected' ? 'destructive' : 
+                  request.status === 'pending' ? 'outline' : 
+                  'secondary'
+                }
+              >
+                {request.status === 'pending' ? 'Pending' : 
+                 request.status === 'rejected' ? 'Rejected' : 
+                 'Approved'}
+              </Badge>
+            </div>
+            <Separator className="my-2" />
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  // Render quiz retry requests
+  const renderQuizRequests = () => {
+    if (isLoading) {
+      return (
+        <div className="space-y-3">
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-12 w-full" />
+        </div>
+      )
+    }
+    
+    if (quizRetryRequests.length === 0) {
+      return (
+        <div className="py-6 text-center text-muted-foreground">
+          No pending quiz retry requests
+        </div>
+      )
+    }
+    
+    return (
+      <div className="space-y-3 max-h-[420px] overflow-y-auto pr-2">
+        {quizRetryRequests.map(request => (
+          <div key={request.id}>
+            <div className="flex justify-between items-center">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">{request.title}</p>
+                {request.details && (
+                  <p className="text-xs text-muted-foreground">
+                    {request.details}
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Submitted on {new Date(request.created_at).toLocaleDateString()}
+                </p>
+              </div>
+              <Badge 
+                variant={
+                  request.status === 'rejected' ? 'destructive' : 
+                  request.status === 'pending' ? 'outline' : 
+                  'secondary'
+                }
+              >
+                {request.status === 'pending' ? 'Pending' : 
+                 request.status === 'rejected' ? 'Rejected' : 
+                 'Approved'}
+              </Badge>
+            </div>
+            <Separator className="my-2" />
+          </div>
+        ))}
       </div>
     )
   }
@@ -364,7 +519,7 @@ export default function StudentRequestsPage() {
               <CardTitle className="text-lg">Quiz Retry Requests</CardTitle>
             </CardHeader>
             <CardContent>
-              {renderRequestsOrEmpty("No pending quiz retry requests")}
+              {renderQuizRequests()}
             </CardContent>
           </Card>
 
@@ -375,7 +530,7 @@ export default function StudentRequestsPage() {
               <CardTitle className="text-lg">Practice Retry Requests</CardTitle>
             </CardHeader>
             <CardContent>
-              {renderRequestsOrEmpty("No pending practice retry requests")}
+              {renderPracticeRequests()}
             </CardContent>
           </Card>
 

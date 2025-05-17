@@ -81,6 +81,8 @@ export default function PracticeToolsPage() {
   const [practicePoints, setPracticePoints] = useState(0)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [practiceCompleted, setPracticeCompleted] = useState(false)
+  const [isPaused, setIsPaused] = useState(false)
+  const [autoPauseModalOpen, setAutoPauseModalOpen] = useState(false)
   const [completionData, setCompletionData] = useState<{
     duration: string;
     points: string;
@@ -96,6 +98,10 @@ export default function PracticeToolsPage() {
   
   // Timer ref to store interval ID
   const timerRef = useRef<NodeJS.Timeout | null>(null)
+  // Audio monitoring refs
+  const audioMonitorIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const micStreamRef = useRef<MediaStream | null>(null)
+  const silenceStartRef = useRef<number | null>(null)
   // Ref to hold each note's HTMLAudioElement and associated WebAudio gain node
   const noteAudioRefs = useRef<Record<string, { element: HTMLAudioElement; gainNode: GainNode }>>({});
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -413,6 +419,7 @@ export default function PracticeToolsPage() {
         setPracticeTime(0)
         setPracticePoints(0)
         setIsPlaying(true)
+        setIsPaused(false)
         sessionStartTimeRef.current = new Date()
         lastUpdateTimeRef.current = new Date()
         startTimer()
@@ -421,6 +428,19 @@ export default function PracticeToolsPage() {
           title: "Practice Started",
           description: "Your practice session has started. The timer is now running.",
         })
+        
+        // Request microphone access and start audio monitoring
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          startAudioMonitoring(stream);
+        } catch (err) {
+          console.error("Microphone access error:", err);
+          toast({
+            title: "Microphone Access Failed",
+            description: "Please allow microphone access to monitor practice session.",
+            variant: "destructive",
+          });
+        }
       }
     } catch (error) {
       console.error('Error starting practice:', error)
@@ -439,6 +459,18 @@ export default function PracticeToolsPage() {
 
       stopTimer()
       setIsPlaying(false)
+      
+      // Clean up audio monitoring
+      if (audioMonitorIntervalRef.current) {
+        clearInterval(audioMonitorIntervalRef.current)
+        audioMonitorIntervalRef.current = null
+      }
+      
+      // Stop microphone stream if it exists
+      if (micStreamRef.current) {
+        micStreamRef.current.getTracks().forEach(track => track.stop())
+        micStreamRef.current = null
+      }
 
       // Recalculate actual elapsed time to avoid timer drift
       const actualSeconds = sessionStartTimeRef.current
@@ -509,11 +541,138 @@ export default function PracticeToolsPage() {
     }
   }
 
+  // Setup audio monitoring to detect silence
+  const startAudioMonitoring = (stream: MediaStream) => {
+    micStreamRef.current = stream;
+    
+    // Create audio context and analyzer
+    const audioCtx = audioContextRef.current || new AudioContext();
+    audioContextRef.current = audioCtx;
+    const source = audioCtx.createMediaStreamSource(stream);
+    const analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 1024;
+    analyser.smoothingTimeConstant = 0.8;
+    source.connect(analyser);
+    
+    // Create data array for analyzing audio levels
+    const dataArray = new Uint8Array(analyser.fftSize);
+    silenceStartRef.current = null;
+    
+    // Define sound threshold
+    const soundThreshold = 0.1; // adjust based on testing (0.0 to 1.0 normalized)
+    
+    // Set up interval to check audio level regularly
+    audioMonitorIntervalRef.current = setInterval(() => {
+      analyser.getByteTimeDomainData(dataArray);
+      
+      // Compute volume metric: normalize 0-255 bytes to 0.0-1.0
+      let sum = 0;
+      for (let i = 0; i < dataArray.length; i++) {
+        const val = dataArray[i] - 128;
+        sum += val * val;
+      }
+      const rms = Math.sqrt(sum / dataArray.length) / 128; // 0.0-1.0
+      const volume = rms;
+      
+      if (volume > soundThreshold) {
+        // Sound detected
+        if (silenceStartRef.current) {
+          console.log("Sound detected after silence. Volume:", volume.toFixed(3));
+        } else {
+          console.log("Sound ongoing. Volume:", volume.toFixed(3));
+        }
+        silenceStartRef.current = null; // reset silence timer
+      } else {
+        // No significant sound
+        if (!silenceStartRef.current) {
+          silenceStartRef.current = Date.now();
+          console.log("No sound detected, starting 3min timer...");
+        }
+        
+        const silentMs = Date.now() - silenceStartRef.current;
+        if (silentMs >= 3 * 60 * 1000) { // 3 minutes = 180,000 ms
+          console.log("No sound for 3 minutes - auto-pausing session.");
+          clearInterval(audioMonitorIntervalRef.current!);
+          audioMonitorIntervalRef.current = null;
+          handleAutoPause(stream);
+        } else if (silentMs % 60000 < 1000) {
+          // Log every minute of silence for tuning
+          console.log(`Silent for ${(silentMs/1000/60).toFixed(1)} minutes...`);
+        }
+      }
+    }, 1000);
+  };
+  
+  // Function to handle auto-pause after 3 minutes of silence
+  const handleAutoPause = async (stream: MediaStream) => {
+    if (!sessionId) return;
+    
+    stopTimer();
+    setIsPlaying(false);
+    setIsPaused(true);
+    
+    // Calculate minutes practiced so far
+    const elapsedSeconds = Math.floor((Date.now() - sessionStartTimeRef.current!.getTime()) / 1000);
+    const elapsedMinutes = Math.floor(elapsedSeconds / 60);
+    
+    // Mark session as paused in DB
+    const { error: sessionErr } = await supabase
+      .from('practice_sessions')
+      .update({
+        status: 'paused',
+        duration_minutes: elapsedMinutes,
+        points: ((elapsedMinutes/60)*2).toFixed(2),
+        was_autopaused: true,
+        paused_at: new Date().toISOString()
+      })
+      .eq('id', sessionId)
+      .eq('status', 'started');
+    
+    if (sessionErr) console.error("Error pausing session:", sessionErr);
+    
+    // Insert a practice retry request for instructor approval
+    const user = await getCurrentUser();
+    const studentProfile = user ? await getStudentProfileByUserId(user.id) : null;
+    
+    if (studentProfile?.id) {
+      const { error: requestErr } = await supabase
+        .from('practice_retry_requests')
+        .insert([{
+          student_id: studentProfile.id,
+          session_id: sessionId,
+          title: "Practice Session Auto-Paused",
+          details: "No sound detected for 3 minutes; session auto-paused at " + new Date().toLocaleTimeString(),
+          status: 'pending'
+        }]);
+      
+      if (requestErr) console.error("Error inserting retry request:", requestErr);
+    }
+    
+    // Notify the user
+    setAutoPauseModalOpen(true);
+    toast({
+      title: "Session Paused",
+      description: "No sound detected for 3 minutes. Your session has been paused.",
+      variant: "destructive"
+    });
+    
+    // Stop the microphone stream
+    stream.getTracks().forEach(t => t.stop());
+  };
+
   // Function to toggle play/pause
   const togglePlay = () => {
     if (isPlaying) {
       handleStopPractice()
     } else {
+      if (sessionId && isPaused) {
+        // Session is paused awaiting approval - do nothing or show a message
+        toast({ 
+          description: "Waiting for instructor approval to resume this session.", 
+          variant: "destructive" 
+        });
+        return;
+      }
       // Show verification dialog instead of starting practice immediately
       setVerificationOpen(true)
     }
@@ -879,6 +1038,24 @@ export default function PracticeToolsPage() {
               className="w-full sm:w-auto"
             >
               Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Auto-Pause Warning Dialog */}
+      <Dialog open={autoPauseModalOpen} onOpenChange={setAutoPauseModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Practice Session Paused</DialogTitle>
+            <DialogDescription>
+              Your practice session has been <strong>automatically paused</strong> due to inactivity (no sound detected for 3 minutes).
+              An approval request has been sent to your instructor. Please resume practice only after your instructor approves.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setAutoPauseModalOpen(false)}>
+              OK
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
+import { useToast } from "@/components/ui/use-toast"
 
 // Types
 interface Student {
@@ -82,6 +83,7 @@ export default function RequestsPage() {
   const [selectedRequest, setSelectedRequest] = useState<FeatureRequest | null>(null)
   const [openDialog, setOpenDialog] = useState(false)
   const [newStatus, setNewStatus] = useState<string>('')
+  const { toast } = useToast()
   
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -99,7 +101,8 @@ export default function RequestsPage() {
     setIsLoading(true)
     
     try {
-      const { data, error } = await supabase
+      // Fetch feature/bug/pin requests
+      const { data: featureData, error: featErr } = await supabase
         .from('feature_requests')
         .select(`
           *,
@@ -111,11 +114,66 @@ export default function RequestsPage() {
         `)
         .order('created_at', { ascending: false });
       
-      if (error) throw error;
+      if (featErr) throw featErr;
       
-      setRequests(data || []);
+      // Fetch quiz retry requests (if there's a quiz_retry_requests table)
+      const { data: quizData, error: quizErr } = await supabase
+        .from('quiz_retry_requests')
+        .select(`
+          *,
+          students:student_id (
+            id,
+            first_name,
+            last_name
+          )
+        `)
+        .order('created_at', { ascending: false });
+      
+      if (quizErr && quizErr.code !== 'PGRST116') throw quizErr;
+      
+      // Fetch practice retry requests
+      const { data: practiceData, error: practErr } = await supabase
+        .from('practice_retry_requests')
+        .select(`
+          *,
+          students:student_id (
+            id,
+            first_name,
+            last_name
+          )
+        `)
+        .order('created_at', { ascending: false });
+      
+      if (practErr && practErr.code !== 'PGRST116') throw practErr;
+      
+      // Combine all requests into one list
+      const allRequests: Request[] = [];
+      // Add feature requests
+      for (const req of featureData || []) {
+        allRequests.push(req);  // FeatureRequest (has 'type')
+      }
+      
+      // Add quiz retry requests if any
+      for (const req of quizData || []) {
+        allRequests.push({ 
+          ...req, 
+          requestType: 'quiz',
+          studentName: req.students ? `${req.students.first_name} ${req.students.last_name}` : 'Unknown Student'
+        });
+      }
+      
+      // Add practice retry requests
+      for (const req of practiceData || []) {
+        allRequests.push({ 
+          ...req, 
+          requestType: 'practice',
+          studentName: req.students ? `${req.students.first_name} ${req.students.last_name}` : 'Unknown Student'
+        });
+      }
+      
+      setRequests(allRequests);
     } catch (error) {
-      console.error('Error fetching feature requests:', error);
+      console.error('Error fetching requests:', error);
     } finally {
       setIsLoading(false);
     }
@@ -368,6 +426,82 @@ export default function RequestsPage() {
     )
   }
 
+  // Handle approving a practice retry request
+  const approvePracticeRetry = async (request: PracticeRequest) => {
+    try {
+      // Update request status to approved
+      const { error: requestError } = await supabase
+        .from('practice_retry_requests')
+        .update({ 
+          status: 'approved',
+          updated_at: new Date().toISOString() 
+        })
+        .eq('id', request.id);
+      
+      if (requestError) throw requestError;
+      
+      // Fetch the requests again to update the UI
+      fetchRequests();
+      
+      toast({
+        title: "Request Approved",
+        description: "The practice retry request has been approved.",
+      });
+    } catch (error) {
+      console.error('Error approving practice retry request:', error);
+      toast({
+        title: "Error",
+        description: "Failed to approve practice retry request. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  // Handle rejecting a practice retry request
+  const rejectPracticeRetry = async (request: PracticeRequest) => {
+    try {
+      // Update request status to rejected
+      const { error: requestError } = await supabase
+        .from('practice_retry_requests')
+        .update({ 
+          status: 'rejected',
+          updated_at: new Date().toISOString() 
+        })
+        .eq('id', request.id);
+      
+      if (requestError) throw requestError;
+      
+      // Mark the associated session as completed so it won't remain paused
+      if (request.session_id) {
+        const { error: sessionError } = await supabase
+          .from('practice_sessions')
+          .update({ 
+            status: 'completed', 
+            completed_at: new Date().toISOString() 
+          })
+          .eq('id', request.session_id)
+          .eq('status', 'paused');
+        
+        if (sessionError) console.error('Error updating session status:', sessionError);
+      }
+      
+      // Fetch the requests again to update the UI
+      fetchRequests();
+      
+      toast({
+        title: "Request Rejected",
+        description: "The practice retry request has been rejected.",
+      });
+    } catch (error) {
+      console.error('Error rejecting practice retry request:', error);
+      toast({
+        title: "Error",
+        description: "Failed to reject practice retry request. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Render other requests or empty state
   const renderRequestsOrEmpty = (requests: PinRequest[] | QuizRequest[] | PracticeRequest[], emptyMessage: string) => {
     if (isLoading) {
@@ -391,17 +525,64 @@ export default function RequestsPage() {
       <div className="space-y-3 max-h-48 overflow-y-auto pr-2">
         {requests.map(request => (
           <div key={request.id} className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
-            <div>
+            <div className="text-sm">
               <p className="font-medium">{request.studentName}</p>
-              <p className="text-sm text-muted-foreground">{request.title}</p>
+              <p className="font-medium">{request.title}</p>
+              {request.details && <p className="text-xs text-muted-foreground">{request.details}</p>}
+              <p className="text-xs text-muted-foreground">
+                Submitted on {new Date(request.created_at).toLocaleString()}
+              </p>
             </div>
-            <div className="flex gap-2">
-              <Button size="sm" variant="outline" className="text-green-500 hover:text-green-600 hover:bg-green-100/10">
-                Approve
-              </Button>
-              <Button size="sm" variant="outline" className="text-red-500 hover:text-red-600 hover:bg-red-100/10">
-                Reject
-              </Button>
+            <div className="flex gap-2 items-center">
+              <Badge variant={
+                request.status === 'pending' ? 'outline' :
+                request.status === 'rejected' ? 'destructive' :
+                'secondary'
+              }>
+                {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+              </Badge>
+              
+              {request.status === 'pending' && (
+                <>
+                  {request.requestType === 'practice' ? (
+                    <>
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="text-green-500 hover:text-green-600 hover:bg-green-100/10"
+                        onClick={() => approvePracticeRetry(request as PracticeRequest)}
+                      >
+                        Approve
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="text-red-500 hover:text-red-600 hover:bg-red-100/10"
+                        onClick={() => rejectPracticeRetry(request as PracticeRequest)}
+                      >
+                        Reject
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="text-green-500 hover:text-green-600 hover:bg-green-100/10"
+                      >
+                        Approve
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="text-red-500 hover:text-red-600 hover:bg-red-100/10"
+                      >
+                        Reject
+                      </Button>
+                    </>
+                  )}
+                </>
+              )}
             </div>
           </div>
         ))}
